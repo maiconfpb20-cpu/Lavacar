@@ -125,7 +125,10 @@ const AdminFuncionarios: React.FC<AdminFuncionariosProps> = ({ staff, setStaff }
   const verifyPinAndExecute = (e?: React.FormEvent) => {
     if (e) e.preventDefault();
     
-    if (pinValue === '1844') {
+    // Ler o PIN dinamicamente do localStorage
+    const savedPin = localStorage.getItem('lavacar_admin_pin') || '1844';
+
+    if (pinValue === savedPin) {
       executeAction();
       setIsPinModalOpen(false);
       setPinValue('');
@@ -400,7 +403,7 @@ const AdminFuncionarios: React.FC<AdminFuncionariosProps> = ({ staff, setStaff }
       {/* Modal de Cadastro/Edição */}
       {isModalOpen && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm animate-in fade-in duration-200">
-          <div className="bg-white w-full max-w-lg rounded-[2.5rem] shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200">
+          <div className="bg-white w-full max-lg rounded-[2.5rem] shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200">
             <header className="bg-blue-600 p-6 flex items-center justify-between text-white">
               <div className="flex items-center gap-3">
                 <div className="p-2 bg-white/20 rounded-xl"><UserPlus size={20} /></div>
