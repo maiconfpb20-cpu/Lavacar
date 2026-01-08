@@ -23,54 +23,70 @@ const App: React.FC = () => {
   const [viewMode, setViewMode] = useState<'admin' | 'customer' | 'login'>('customer');
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
-  const [lastSync, setLastSync] = useState<Date>(new Date());
   const [syncError, setSyncError] = useState(false);
   const [initialLoadDone, setInitialLoadDone] = useState(false);
 
-  const [bookings, setBookings] = useState<Booking[]>([]);
-  const [staff, setStaff] = useState<StaffMember[]>([]);
-  const [clients, setClients] = useState<Client[]>([]);
-  const [availableSlots, setAvailableSlots] = useState<AvailableSlot[]>([]);
-  const [adminPin, setAdminPin] = useState('1844');
+  // Carrega dados iniciais do LocalStorage para evitar tela vazia
+  const getInitialData = (key: string, defaultValue: any) => {
+    const saved = localStorage.getItem(`lavacar_cache_${WASH_ID}_${key}`);
+    return saved ? JSON.parse(saved) : defaultValue;
+  };
+
+  const [bookings, setBookings] = useState<Booking[]>(() => getInitialData('bookings', []));
+  const [staff, setStaff] = useState<StaffMember[]>(() => getInitialData('staff', []));
+  const [clients, setClients] = useState<Client[]>(() => getInitialData('clients', []));
+  const [availableSlots, setAvailableSlots] = useState<AvailableSlot[]>(() => getInitialData('slots', []));
+  const [adminPin, setAdminPin] = useState(() => localStorage.getItem('lavacar_admin_pin') || '1844');
 
   const skipSyncRef = useRef(true);
 
+  // Salva no LocalStorage sempre que mudar (Cache de segurança)
+  useEffect(() => {
+    if (!initialLoadDone) return;
+    localStorage.setItem(`lavacar_cache_${WASH_ID}_bookings`, JSON.stringify(bookings));
+    localStorage.setItem(`lavacar_cache_${WASH_ID}_staff`, JSON.stringify(staff));
+    localStorage.setItem(`lavacar_cache_${WASH_ID}_clients`, JSON.stringify(clients));
+    localStorage.setItem(`lavacar_cache_${WASH_ID}_slots`, JSON.stringify(availableSlots));
+  }, [bookings, staff, clients, availableSlots, initialLoadDone]);
+
   // Carregamento de Dados da Nuvem
   const loadData = useCallback(async (isAuto = true) => {
-    // Se já estiver sincronizando manualmente, ignora o auto
     if (isSyncing && isAuto) return;
     
     setIsSyncing(true);
-    const cloudData = await fetchDataFromCloud();
-    
-    if (cloudData) {
-      skipSyncRef.current = true; // Evita que o setStates abaixo disparem um novo sync para a nuvem
-      setBookings(cloudData.bookings || []);
-      setStaff(cloudData.staff || []);
-      setClients(cloudData.clients || []);
-      setAvailableSlots(cloudData.availableSlots || []);
-      if (cloudData.adminPin) {
-        setAdminPin(cloudData.adminPin);
-        localStorage.setItem('lavacar_admin_pin', cloudData.adminPin);
+    try {
+      const cloudData = await fetchDataFromCloud();
+      
+      if (cloudData) {
+        skipSyncRef.current = true; 
+        setBookings(cloudData.bookings || []);
+        setStaff(cloudData.staff || []);
+        setClients(cloudData.clients || []);
+        setAvailableSlots(cloudData.availableSlots || []);
+        if (cloudData.adminPin) {
+          setAdminPin(cloudData.adminPin);
+          localStorage.setItem('lavacar_admin_pin', cloudData.adminPin);
+        }
+        setInitialLoadDone(true);
+        setSyncError(false);
+      } else {
+        // Se a nuvem estiver vazia mas tivermos dados locais, consideramos o inicialDone para permitir o primeiro upload
+        setInitialLoadDone(true);
       }
-      setInitialLoadDone(true);
-    } else if (!isAuto) {
-      // Se falhar no manual (ex: primeira vez do app), marca como carregado para permitir salvar
-      setInitialLoadDone(true);
+    } catch (e) {
+      setSyncError(true);
+    } finally {
+      setIsSyncing(false);
     }
-    
-    setIsSyncing(false);
-    setLastSync(new Date());
   }, [isSyncing]);
 
-  // Efeito Inicial e Polling (verifica novos dados a cada 10 segundos)
   useEffect(() => {
     loadData(false);
-    const interval = setInterval(() => loadData(true), 10000);
+    const interval = setInterval(() => loadData(true), 15000);
     return () => clearInterval(interval);
   }, []);
 
-  // Sincronização de saída (Salvar na nuvem quando algo mudar localmente)
+  // Sincronização de saída (Só acontece se o load inicial foi concluído)
   const syncAll = useCallback(async () => {
     if (!initialLoadDone) return;
     
@@ -86,7 +102,6 @@ const App: React.FC = () => {
     const success = await syncDataToCloud(data);
     setSyncError(!success);
     setIsSyncing(false);
-    setLastSync(new Date());
   }, [bookings, staff, clients, availableSlots, adminPin, initialLoadDone]);
 
   useEffect(() => {
@@ -97,7 +112,7 @@ const App: React.FC = () => {
 
     const timer = setTimeout(() => {
       syncAll();
-    }, 1000);
+    }, 2000);
     return () => clearTimeout(timer);
   }, [bookings, staff, clients, availableSlots, adminPin, syncAll]);
 
@@ -226,12 +241,7 @@ const App: React.FC = () => {
         </header>
 
         <main className="flex-1 overflow-y-auto bg-[#f8fafc]">
-          {!initialLoadDone ? (
-            <div className="flex flex-col items-center justify-center h-full gap-4">
-              <RefreshCw className="text-blue-600 animate-spin" size={48} />
-              <p className="text-xs font-black text-slate-400 uppercase tracking-widest">Carregando Dados da Nuvem...</p>
-            </div>
-          ) : renderAdminContent()}
+          {renderAdminContent()}
         </main>
       </div>
 
