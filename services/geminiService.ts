@@ -1,9 +1,16 @@
 
 import { GoogleGenAI } from "@google/genai";
 
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+const getAIClient = () => {
+  const apiKey = process.env.API_KEY;
+  if (!apiKey) return null;
+  return new GoogleGenAI({ apiKey });
+};
 
 export const getAIInsights = async (prompt: string) => {
+  const ai = getAIClient();
+  if (!ai) return "Configuração de IA não disponível.";
+
   try {
     const response = await ai.models.generateContent({
       model: 'gemini-3-flash-preview',

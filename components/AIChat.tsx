@@ -1,8 +1,8 @@
 
 import React, { useState, useRef, useEffect } from 'react';
 import { Send, Bot, X, Sparkles } from 'lucide-react';
-import { getAIInsights } from '../services/geminiService';
-import { ChatMessage } from '../types';
+import { getAIInsights } from '../services/geminiService.ts';
+import { ChatMessage } from '../types.ts';
 
 const AIChat: React.FC = () => {
   const [isOpen, setIsOpen] = useState(false);
@@ -46,7 +46,6 @@ const AIChat: React.FC = () => {
 
       {isOpen && (
         <div className="bg-white w-80 md:w-96 h-[500px] rounded-3xl shadow-2xl flex flex-col overflow-hidden border border-slate-100">
-          {/* Header */}
           <div className="bg-blue-600 p-4 flex items-center justify-between text-white">
             <div className="flex items-center gap-2">
               <Bot size={24} />
@@ -60,7 +59,6 @@ const AIChat: React.FC = () => {
             </button>
           </div>
 
-          {/* Messages */}
           <div ref={scrollRef} className="flex-1 overflow-y-auto p-4 space-y-4 bg-slate-50">
             {messages.length === 0 && (
               <div className="text-center py-8">
@@ -90,7 +88,6 @@ const AIChat: React.FC = () => {
             )}
           </div>
 
-          {/* Input */}
           <div className="p-4 border-t border-slate-100 flex gap-2">
             <input
               type="text"

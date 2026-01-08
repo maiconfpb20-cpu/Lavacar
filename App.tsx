@@ -1,22 +1,20 @@
 
 import React, { useState, useEffect } from 'react';
-import Sidebar from './components/Sidebar';
-import Dashboard from './components/Dashboard';
-import CustomerPortal from './components/CustomerPortal';
-import AdminAgendamentos from './components/AdminAgendamentos';
-import AdminSlots from './components/AdminSlots';
-import AdminVeiculos from './components/AdminVeiculos';
-import AdminFilaEspera from './components/AdminFilaEspera';
-import AdminHistorico from './components/AdminHistorico';
-import AdminFuncionarios from './components/AdminFuncionarios';
-import AdminClientes from './components/AdminClientes';
-import AdminFinanceiro from './components/AdminFinanceiro';
-import Login from './components/Login';
-import AIChat from './components/AIChat';
-import { MenuSection, Booking, BookingStatus, AvailableSlot, StaffMember, Client } from './types';
+import Sidebar from './components/Sidebar.tsx';
+import Dashboard from './components/Dashboard.tsx';
+import CustomerPortal from './components/CustomerPortal.tsx';
+import AdminAgendamentos from './components/AdminAgendamentos.tsx';
+import AdminSlots from './components/AdminSlots.tsx';
+import AdminVeiculos from './components/AdminVeiculos.tsx';
+import AdminFilaEspera from './components/AdminFilaEspera.tsx';
+import AdminHistorico from './components/AdminHistorico.tsx';
+import AdminFuncionarios from './components/AdminFuncionarios.tsx';
+import AdminClientes from './components/AdminClientes.tsx';
+import AdminFinanceiro from './components/AdminFinanceiro.tsx';
+import Login from './components/Login.tsx';
+import AIChat from './components/AIChat.tsx';
+import { MenuSection, Booking, BookingStatus, AvailableSlot, StaffMember, Client } from './types.ts';
 import { Menu, X, Lock } from 'lucide-react';
-
-const initialStaff: StaffMember[] = [];
 
 const App: React.FC = () => {
   const [activeSection, setActiveSection] = useState<MenuSection>(MenuSection.Dashboard);
@@ -25,7 +23,7 @@ const App: React.FC = () => {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   
   const [bookings, setBookings] = useState<Booking[]>([]);
-  const [staff, setStaff] = useState<StaffMember[]>(initialStaff);
+  const [staff, setStaff] = useState<StaffMember[]>([]);
   const [clients, setClients] = useState<Client[]>([]);
   const [availableSlots, setAvailableSlots] = useState<AvailableSlot[]>([
     { id: '1', date: '2025-05-20', time: '09:00' },
@@ -35,10 +33,8 @@ const App: React.FC = () => {
     { id: '5', date: '2025-05-22', time: '16:30' },
   ]);
 
-  // Sincronizar clientes a partir de bookings sempre que bookings mudar
   useEffect(() => {
     const customerMap = new Map<string, Client>();
-    
     clients.forEach(c => customerMap.set(c.phone, c));
 
     bookings.forEach(b => {
@@ -150,12 +146,7 @@ const App: React.FC = () => {
           />
         );
       default:
-        return (
-          <div className="flex flex-col items-center justify-center min-h-[80vh] text-slate-400">
-            <h2 className="text-xl font-bold mb-2">Módulo {activeSection}</h2>
-            <p>Esta funcionalidade está sendo implementada.</p>
-          </div>
-        );
+        return null;
     }
   };
 

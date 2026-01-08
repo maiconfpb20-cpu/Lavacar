@@ -1,13 +1,9 @@
 
 import React from 'react';
 import { DollarSign, Clock, CheckCircle2, ListFilter } from 'lucide-react';
-import DashboardCard from './DashboardCard';
+import DashboardCard from './DashboardCard.tsx';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
-import { Booking } from '../types';
-
-interface DashboardProps {
-  bookings: Booking[];
-}
+import { Booking } from '../types.ts';
 
 const data = [
   { name: 'Seg', total: 400 },
@@ -19,8 +15,7 @@ const data = [
   { name: 'Dom', total: 800 },
 ];
 
-const Dashboard: React.FC<DashboardProps> = ({ bookings }) => {
-  // Cálculos baseados nos dados reais
+const Dashboard: React.FC<{ bookings: Booking[] }> = ({ bookings }) => {
   const activeFila = bookings.filter(b => b.status === 'Pendente' || b.status === 'Em Andamento').length;
   const completedToday = bookings.filter(b => {
     const isCompleted = b.status === 'Concluído';
@@ -76,28 +71,15 @@ const Dashboard: React.FC<DashboardProps> = ({ bookings }) => {
             <h3 className="text-lg font-bold text-slate-800">Desempenho Semanal</h3>
             <p className="text-slate-400 text-sm">Volume de veículos atendidos por dia</p>
           </div>
-          <select className="bg-slate-50 border-none rounded-lg px-4 py-2 text-sm font-medium text-slate-600 focus:ring-2 focus:ring-blue-500">
-            <option>Esta Semana</option>
-            <option>Semana Passada</option>
-          </select>
         </div>
         
         <div className="h-[300px] w-full">
           <ResponsiveContainer width="100%" height="100%">
             <BarChart data={data}>
               <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-              <XAxis 
-                dataKey="name" 
-                axisLine={false} 
-                tickLine={false} 
-                tick={{ fill: '#94a3b8', fontSize: 12 }}
-                dy={10}
-              />
+              <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fill: '#94a3b8', fontSize: 12 }} dy={10} />
               <YAxis hide />
-              <Tooltip 
-                cursor={{ fill: '#f8fafc' }}
-                contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }}
-              />
+              <Tooltip cursor={{ fill: '#f8fafc' }} contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }} />
               <Bar dataKey="total" radius={[6, 6, 0, 0]} barSize={40}>
                 {data.map((entry, index) => (
                   <Cell key={`cell-${index}`} fill={index === 5 ? '#2563eb' : '#cbd5e1'} />
