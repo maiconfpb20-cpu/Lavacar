@@ -1,6 +1,9 @@
 
 import React, { useState, useEffect } from 'react';
-import { Calendar, Clock, Plus, Trash2, CalendarCheck, ShieldCheck, Lock, Save, CheckCircle2, Key } from 'lucide-react';
+import { 
+  Calendar, Clock, Plus, Trash2, CalendarCheck, ShieldCheck, 
+  Lock, Save, CheckCircle2, Key, Share2, Copy, Globe 
+} from 'lucide-react';
 import { AvailableSlot } from '../types.ts';
 
 interface AdminSlotsProps {
@@ -10,7 +13,7 @@ interface AdminSlotsProps {
 }
 
 const AdminSlots: React.FC<AdminSlotsProps> = ({ slots, onAddSlot, onRemoveSlot }) => {
-  const [activeTab, setActiveTab] = useState<'agenda' | 'seguranca'>('agenda');
+  const [activeTab, setActiveTab] = useState<'agenda' | 'seguranca' | 'sync'>('agenda');
   const [date, setDate] = useState('');
   const [time, setTime] = useState('');
   
@@ -19,6 +22,7 @@ const AdminSlots: React.FC<AdminSlotsProps> = ({ slots, onAddSlot, onRemoveSlot 
   const [newPin, setNewPin] = useState('');
   const [confirmPin, setConfirmPin] = useState('');
   const [pinStatus, setPinStatus] = useState<'idle' | 'success' | 'error'>('idle');
+  const [copySuccess, setCopySuccess] = useState(false);
 
   useEffect(() => {
     const savedPin = localStorage.getItem('lavacar_admin_pin') || '1844';
@@ -53,29 +57,43 @@ const AdminSlots: React.FC<AdminSlotsProps> = ({ slots, onAddSlot, onRemoveSlot 
     setTimeout(() => setPinStatus('idle'), 3000);
   };
 
+  const copySyncLink = () => {
+    const url = window.location.origin;
+    navigator.clipboard.writeText(url);
+    setCopySuccess(true);
+    setTimeout(() => setCopySuccess(false), 3000);
+  };
+
   return (
     <div className="p-8 max-w-7xl mx-auto">
       <header className="mb-10">
         <h2 className="text-2xl font-black text-slate-800 tracking-tighter uppercase">Configurações do Sistema</h2>
-        <div className="flex gap-4 mt-6 border-b border-slate-200">
+        <div className="flex gap-4 mt-6 border-b border-slate-200 overflow-x-auto scrollbar-hide">
           <button 
             onClick={() => setActiveTab('agenda')}
-            className={`pb-4 px-2 text-xs font-black uppercase tracking-widest transition-all relative ${activeTab === 'agenda' ? 'text-blue-600' : 'text-slate-400 hover:text-slate-600'}`}
+            className={`pb-4 px-2 text-[10px] font-black uppercase tracking-widest transition-all relative whitespace-nowrap ${activeTab === 'agenda' ? 'text-blue-600' : 'text-slate-400 hover:text-slate-600'}`}
           >
             Agenda do Portal
             {activeTab === 'agenda' && <div className="absolute bottom-0 left-0 right-0 h-1 bg-blue-600 rounded-t-full"></div>}
           </button>
           <button 
             onClick={() => setActiveTab('seguranca')}
-            className={`pb-4 px-2 text-xs font-black uppercase tracking-widest transition-all relative ${activeTab === 'seguranca' ? 'text-blue-600' : 'text-slate-400 hover:text-slate-600'}`}
+            className={`pb-4 px-2 text-[10px] font-black uppercase tracking-widest transition-all relative whitespace-nowrap ${activeTab === 'seguranca' ? 'text-blue-600' : 'text-slate-400 hover:text-slate-600'}`}
           >
             Segurança & PIN
             {activeTab === 'seguranca' && <div className="absolute bottom-0 left-0 right-0 h-1 bg-blue-600 rounded-t-full"></div>}
           </button>
+          <button 
+            onClick={() => setActiveTab('sync')}
+            className={`pb-4 px-2 text-[10px] font-black uppercase tracking-widest transition-all relative whitespace-nowrap ${activeTab === 'sync' ? 'text-blue-600' : 'text-slate-400 hover:text-slate-600'}`}
+          >
+            Link do Cliente
+            {activeTab === 'sync' && <div className="absolute bottom-0 left-0 right-0 h-1 bg-blue-600 rounded-t-full"></div>}
+          </button>
         </div>
       </header>
 
-      {activeTab === 'agenda' ? (
+      {activeTab === 'agenda' && (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 animate-in fade-in duration-300">
           <div className="lg:col-span-1">
             <form onSubmit={handleAddSlot} className="bg-white p-6 rounded-[2.5rem] shadow-sm border border-slate-100 space-y-6">
@@ -146,7 +164,9 @@ const AdminSlots: React.FC<AdminSlotsProps> = ({ slots, onAddSlot, onRemoveSlot 
             </div>
           </div>
         </div>
-      ) : (
+      )}
+
+      {activeTab === 'seguranca' && (
         <div className="max-w-xl animate-in slide-in-from-bottom-4 duration-300">
           <div className="bg-white p-10 rounded-[2.5rem] shadow-sm border border-slate-100">
             <div className="flex items-center gap-4 mb-8">
@@ -211,13 +231,6 @@ const AdminSlots: React.FC<AdminSlotsProps> = ({ slots, onAddSlot, onRemoveSlot 
                 </div>
               </div>
 
-              <div className="bg-amber-50 p-4 rounded-2xl border border-amber-100 flex items-start gap-3">
-                <div className="text-amber-500 mt-0.5"><ShieldCheck size={18} /></div>
-                <p className="text-[10px] font-bold text-amber-700 leading-tight">
-                  Este PIN será solicitado sempre que você tentar alterar dias trabalhados ou efetuar pagamentos aos funcionários. <span className="font-black uppercase">Não compartilhe este código.</span>
-                </p>
-              </div>
-
               <button 
                 type="submit"
                 className={`w-full py-5 rounded-2xl font-black uppercase tracking-widest transition-all shadow-xl flex items-center justify-center gap-3 active:scale-95 ${
@@ -233,6 +246,55 @@ const AdminSlots: React.FC<AdminSlotsProps> = ({ slots, onAddSlot, onRemoveSlot 
                 )}
               </button>
             </form>
+          </div>
+        </div>
+      )}
+
+      {activeTab === 'sync' && (
+        <div className="max-w-2xl animate-in slide-in-from-right-4 duration-300">
+          <div className="bg-white p-10 rounded-[2.5rem] shadow-sm border border-slate-100">
+            <div className="flex items-center gap-4 mb-8">
+              <div className="w-14 h-14 bg-blue-600 rounded-2xl flex items-center justify-center text-white shadow-xl shadow-blue-500/20">
+                <Globe size={28} />
+              </div>
+              <div>
+                <h3 className="text-xl font-black text-slate-800 uppercase tracking-tight">Seu Link Público</h3>
+                <p className="text-slate-400 text-xs font-bold uppercase tracking-widest mt-1">Divulgue para seus clientes</p>
+              </div>
+            </div>
+
+            <div className="bg-blue-50 p-8 rounded-[2rem] border-2 border-dashed border-blue-200 text-center space-y-6">
+              <div>
+                <p className="text-xs font-black text-slate-500 uppercase tracking-[0.2em] mb-4">Link Direto para Agendamento:</p>
+                <div className="bg-white p-4 rounded-2xl border border-blue-100 flex items-center gap-3 overflow-hidden shadow-sm">
+                  <p className="flex-1 text-sm font-bold text-blue-600 truncate text-left">
+                    {window.location.origin}
+                  </p>
+                  <button 
+                    onClick={copySyncLink}
+                    className={`flex items-center gap-2 px-6 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${copySuccess ? 'bg-emerald-500 text-white' : 'bg-blue-600 text-white hover:bg-blue-700'}`}
+                  >
+                    {copySuccess ? <><CheckCircle2 size={14} /> Copiado!</> : <><Copy size={14} /> Copiar Link</>}
+                  </button>
+                </div>
+              </div>
+
+              <div className="bg-white/50 p-6 rounded-2xl border border-blue-100/50 text-left">
+                <h4 className="text-xs font-black text-blue-600 uppercase tracking-widest mb-3 flex items-center gap-2">
+                  <Share2 size={14} /> Por que esse link?
+                </h4>
+                <p className="text-xs font-medium text-slate-500 leading-relaxed">
+                  Qualquer pessoa que acessar este endereço verá automaticamente os seus horários disponíveis e poderá agendar. Você não precisa enviar códigos ou IDs complexos.
+                </p>
+              </div>
+            </div>
+
+            <div className="mt-10 pt-8 border-t border-slate-100 flex items-center justify-between">
+              <div className="flex items-center gap-2 text-emerald-600">
+                <div className="w-2.5 h-2.5 bg-emerald-500 rounded-full animate-pulse"></div>
+                <span className="text-[10px] font-black uppercase tracking-widest">Sincronização em Tempo Real Ativa</span>
+              </div>
+            </div>
           </div>
         </div>
       )}
