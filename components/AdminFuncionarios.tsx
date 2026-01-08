@@ -1,10 +1,10 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { 
   UserPlus, ShieldCheck, Mail, DollarSign, 
-  Plus, Minus, Calculator, X, Save, Trash2, Edit3, CheckCircle2, Wallet, History, Users, Receipt, AlertCircle
+  Plus, Minus, Calculator, X, Save, Trash2, Edit3, CheckCircle2, Wallet, History, Users, Receipt, AlertCircle, Lock, Key
 } from 'lucide-react';
-import { StaffMember, StaffPayment } from '../types';
+import { StaffMember, StaffPayment } from '../types.ts';
 
 interface AdminFuncionariosProps {
   staff: StaffMember[];
@@ -13,9 +13,16 @@ interface AdminFuncionariosProps {
 
 const AdminFuncionarios: React.FC<AdminFuncionariosProps> = ({ staff, setStaff }) => {
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isPinModalOpen, setIsPinModalOpen] = useState(false);
+  const [pinValue, setPinValue] = useState('');
+  const [pinError, setPinError] = useState(false);
+  const [pendingAction, setPendingAction] = useState<{ type: 'DAY' | 'PAY', memberId: number, data?: any } | null>(null);
+  
   const [editingMember, setEditingMember] = useState<StaffMember | null>(null);
   const [payingId, setPayingId] = useState<number | null>(null);
   const [showSuccess, setShowSuccess] = useState<number | null>(null);
+  
+  const pinInputRef = useRef<HTMLInputElement>(null);
 
   const [formData, setFormData] = useState<Partial<StaffMember>>({
     name: '',
@@ -28,13 +35,18 @@ const AdminFuncionarios: React.FC<AdminFuncionariosProps> = ({ staff, setStaff }
     paymentHistory: []
   });
 
-  // Limpar mensagem de sucesso após 3 segundos
   useEffect(() => {
     if (showSuccess) {
       const timer = setTimeout(() => setShowSuccess(null), 3000);
       return () => clearTimeout(timer);
     }
   }, [showSuccess]);
+
+  useEffect(() => {
+    if (isPinModalOpen) {
+      setTimeout(() => pinInputRef.current?.focus(), 100);
+    }
+  }, [isPinModalOpen]);
 
   const openModal = (member?: StaffMember) => {
     if (member) {
@@ -89,42 +101,66 @@ const AdminFuncionarios: React.FC<AdminFuncionariosProps> = ({ staff, setStaff }
     }
   };
 
-  const handleDayChange = (id: number, delta: number) => {
-    setStaff(prev => prev.map(member => {
-      if (member.id === id) {
-        const newDays = Math.max(0, member.workedDays + delta);
-        return { ...member, workedDays: newDays };
-      }
-      return member;
-    }));
+  // Solicitar PIN para alterar dias
+  const requestDayChange = (id: number, delta: number) => {
+    setPendingAction({ type: 'DAY', memberId: id, data: { delta } });
+    setIsPinModalOpen(true);
+    setPinValue('');
+    setPinError(false);
   };
 
-  const updateStaffDailyRate = (id: number, rate: number) => {
-    setStaff(prev => prev.map(member => 
-      member.id === id ? { ...member, dailyRate: rate } : member
-    ));
-  };
-
-  const handlePayment = (member: StaffMember) => {
+  // Solicitar PIN para pagamento
+  const requestPayment = (member: StaffMember) => {
     const amountToPay = member.dailyRate * member.workedDays;
-    
     if (amountToPay <= 0) {
       alert("Este funcionário não possui dias trabalhados para receber pagamento.");
       return;
     }
+    setPendingAction({ type: 'PAY', memberId: member.id, data: { amountToPay, memberName: member.name } });
+    setIsPinModalOpen(true);
+    setPinValue('');
+    setPinError(false);
+  };
 
-    if (window.confirm(`Deseja confirmar o pagamento de R$ ${amountToPay.toFixed(2)} para ${member.name}? Isso resetará os dias trabalhados.`)) {
-      setPayingId(member.id);
+  const verifyPinAndExecute = (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    
+    if (pinValue === '1844') {
+      executeAction();
+      setIsPinModalOpen(false);
+      setPinValue('');
+      setPendingAction(null);
+    } else {
+      setPinError(true);
+      setPinValue('');
+      setTimeout(() => setPinError(false), 2000);
+    }
+  };
 
+  const executeAction = () => {
+    if (!pendingAction) return;
+
+    if (pendingAction.type === 'DAY') {
+      const { delta } = pendingAction.data;
+      setStaff(prev => prev.map(member => {
+        if (member.id === pendingAction.memberId) {
+          const newDays = Math.max(0, member.workedDays + delta);
+          return { ...member, workedDays: newDays };
+        }
+        return member;
+      }));
+    } else if (pendingAction.type === 'PAY') {
+      const { amountToPay } = pendingAction.data;
+      setPayingId(pendingAction.memberId);
+      
       const newPayment: StaffPayment = {
         id: Math.random().toString(36).substr(2, 6).toUpperCase(),
         amount: amountToPay,
         date: new Date().toISOString()
       };
 
-      // Atualização imediata do estado
       setStaff(prev => prev.map(m => {
-        if (m.id === member.id) {
+        if (m.id === pendingAction.memberId) {
           const currentHistory = m.paymentHistory || [];
           return {
             ...m,
@@ -136,10 +172,15 @@ const AdminFuncionarios: React.FC<AdminFuncionariosProps> = ({ staff, setStaff }
         return m;
       }));
 
-      // Feedback visual
-      setShowSuccess(member.id);
+      setShowSuccess(pendingAction.memberId);
       setPayingId(null);
     }
+  };
+
+  const updateStaffDailyRate = (id: number, rate: number) => {
+    setStaff(prev => prev.map(member => 
+      member.id === id ? { ...member, dailyRate: rate } : member
+    ));
   };
 
   return (
@@ -147,7 +188,10 @@ const AdminFuncionarios: React.FC<AdminFuncionariosProps> = ({ staff, setStaff }
       <header className="mb-10 flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h2 className="text-2xl font-black text-slate-800 tracking-tighter uppercase">Gestão de Equipe</h2>
-          <p className="text-blue-600 text-sm font-bold tracking-widest uppercase mt-1">Controle de Pagamentos e Histórico</p>
+          <div className="flex items-center gap-2 mt-1">
+            <p className="text-blue-600 text-sm font-bold tracking-widest uppercase">Pagamentos Protegidos</p>
+            <ShieldCheck size={14} className="text-emerald-500" />
+          </div>
         </div>
         <button 
           onClick={() => openModal()}
@@ -164,7 +208,7 @@ const AdminFuncionarios: React.FC<AdminFuncionariosProps> = ({ staff, setStaff }
           </div>
           <div>
             <h3 className="text-lg font-bold text-slate-800 uppercase tracking-tight">Equipe Vazia</h3>
-            <p className="text-slate-400 text-sm font-medium mt-1">Cadastre seus funcionários para gerenciar diárias e pagamentos.</p>
+            <p className="text-slate-400 text-sm font-medium mt-1">Cadastre seus funcionários para gerenciar diárias.</p>
           </div>
         </div>
       ) : (
@@ -172,13 +216,9 @@ const AdminFuncionarios: React.FC<AdminFuncionariosProps> = ({ staff, setStaff }
           {staff.map((member) => (
             <div key={member.id} className={`bg-white p-6 rounded-[2.5rem] border-2 transition-all duration-300 flex flex-col group ${showSuccess === member.id ? 'border-emerald-500 shadow-xl shadow-emerald-500/10' : 'border-slate-100 shadow-sm hover:shadow-xl hover:shadow-slate-200/50'}`}>
               
-              {/* Header do Card */}
               <div className="flex flex-col items-center text-center mb-6 relative">
                 <div className="absolute right-0 top-0">
-                  <button 
-                    onClick={() => openModal(member)}
-                    className="p-2 text-slate-300 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition-all"
-                  >
+                  <button onClick={() => openModal(member)} className="p-2 text-slate-300 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition-all">
                     <Edit3 size={18} />
                   </button>
                 </div>
@@ -196,15 +236,14 @@ const AdminFuncionarios: React.FC<AdminFuncionariosProps> = ({ staff, setStaff }
                 </span>
               </div>
 
-              {/* Área de Cálculo */}
               <div className="bg-slate-50 p-5 rounded-3xl space-y-4 flex-1">
                 <div className="flex items-center justify-between">
                   <h5 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] flex items-center gap-2">
                     <Calculator size={14} className="text-blue-600" /> Folha Atual
                   </h5>
-                  {showSuccess === member.id && (
-                    <span className="text-[9px] font-black text-emerald-600 uppercase animate-pulse">Pagamento Realizado!</span>
-                  )}
+                  <div className="flex items-center gap-1 text-[8px] font-black text-slate-300 uppercase">
+                    <Lock size={10} /> PIN Requerido
+                  </div>
                 </div>
 
                 <div className="grid grid-cols-2 gap-4">
@@ -224,9 +263,9 @@ const AdminFuncionarios: React.FC<AdminFuncionariosProps> = ({ staff, setStaff }
                   <div className="space-y-1">
                     <label className="text-[9px] font-black text-slate-500 uppercase ml-1">Dias Pendentes</label>
                     <div className="flex items-center gap-2">
-                      <button onClick={() => handleDayChange(member.id, -1)} className="p-1.5 bg-white rounded-lg text-slate-400 hover:text-red-500 shadow-sm"><Minus size={14} /></button>
+                      <button onClick={() => requestDayChange(member.id, -1)} className="p-1.5 bg-white rounded-lg text-slate-400 hover:text-red-500 shadow-sm transition-transform active:scale-90"><Minus size={14} /></button>
                       <span className="flex-1 text-center font-black text-slate-800 text-sm">{member.workedDays}</span>
-                      <button onClick={() => handleDayChange(member.id, 1)} className="p-1.5 bg-white rounded-lg text-slate-400 hover:text-emerald-500 shadow-sm"><Plus size={14} /></button>
+                      <button onClick={() => requestDayChange(member.id, 1)} className="p-1.5 bg-white rounded-lg text-slate-400 hover:text-emerald-500 shadow-sm transition-transform active:scale-90"><Plus size={14} /></button>
                     </div>
                   </div>
                 </div>
@@ -243,17 +282,16 @@ const AdminFuncionarios: React.FC<AdminFuncionariosProps> = ({ staff, setStaff }
                   </div>
                 </div>
 
-                {/* Histórico Interno */}
                 <div className="pt-4 border-t border-slate-200">
                    <h6 className="text-[9px] font-black text-slate-400 uppercase tracking-[0.2em] mb-2 flex items-center gap-2">
                      <Receipt size={12} /> Histórico Recente
                    </h6>
-                   <div className="space-y-1.5 max-h-24 overflow-y-auto pr-1 scrollbar-hide">
+                   <div className="space-y-1.5 max-h-24 overflow-y-auto pr-1 scrollbar-hide custom-scrollbar">
                      {member.paymentHistory && member.paymentHistory.length > 0 ? (
                        member.paymentHistory.slice(0, 5).map((pay) => (
                          <div key={pay.id} className="bg-white/60 p-2 rounded-xl border border-slate-200 flex items-center justify-between animate-in slide-in-from-top-1">
                            <div>
-                             <p className="text-[8px] font-black text-slate-800">PAG-#{pay.id}</p>
+                             <p className="text-[8px] font-black text-slate-800 uppercase tracking-tighter">REC-#{pay.id}</p>
                              <p className="text-[7px] font-bold text-slate-400 uppercase">{new Date(pay.date).toLocaleDateString()}</p>
                            </div>
                            <span className="text-[10px] font-black text-emerald-600">+ R$ {pay.amount.toFixed(2)}</span>
@@ -261,7 +299,7 @@ const AdminFuncionarios: React.FC<AdminFuncionariosProps> = ({ staff, setStaff }
                        ))
                      ) : (
                        <div className="py-4 text-center">
-                         <p className="text-[8px] text-slate-300 font-black uppercase tracking-widest italic">Nenhum pagamento efetuado</p>
+                         <p className="text-[8px] text-slate-300 font-black uppercase tracking-widest italic">Sem registros</p>
                        </div>
                      )}
                    </div>
@@ -272,9 +310,8 @@ const AdminFuncionarios: React.FC<AdminFuncionariosProps> = ({ staff, setStaff }
                 </div>
               </div>
 
-              {/* Botão de Ação Principal */}
               <button 
-                onClick={() => handlePayment(member)}
+                onClick={() => requestPayment(member)}
                 disabled={payingId === member.id || member.workedDays === 0}
                 className={`w-full mt-4 py-4 rounded-2xl font-black text-[10px] uppercase tracking-widest transition-all flex items-center justify-center gap-2 ${
                   showSuccess === member.id
@@ -285,7 +322,7 @@ const AdminFuncionarios: React.FC<AdminFuncionariosProps> = ({ staff, setStaff }
                 }`}
               >
                 {showSuccess === member.id ? (
-                  <><CheckCircle2 size={16} /> Pago e Resetado!</>
+                  <><CheckCircle2 size={16} /> Sucesso!</>
                 ) : payingId === member.id ? (
                   <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
                 ) : member.workedDays === 0 ? (
@@ -296,6 +333,67 @@ const AdminFuncionarios: React.FC<AdminFuncionariosProps> = ({ staff, setStaff }
               </button>
             </div>
           ))}
+        </div>
+      )}
+
+      {/* MODAL DE SEGURANÇA PIN */}
+      {isPinModalOpen && (
+        <div className="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-md animate-in fade-in duration-300">
+          <div className="bg-white w-full max-w-sm rounded-[2.5rem] shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200 border border-white/20">
+            <header className="bg-slate-900 p-8 text-center text-white relative">
+              <div className="w-16 h-16 bg-blue-600 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-xl shadow-blue-600/20 animate-bounce">
+                <Lock size={32} />
+              </div>
+              <h3 className="font-black uppercase tracking-widest text-lg">Área Protegida</h3>
+              <p className="text-[10px] text-slate-400 font-bold uppercase tracking-[0.2em] mt-2">Digite o PIN de Segurança para prosseguir</p>
+              
+              <button 
+                onClick={() => { setIsPinModalOpen(false); setPendingAction(null); }} 
+                className="absolute top-6 right-6 text-slate-500 hover:text-white transition-colors"
+              >
+                <X size={20} />
+              </button>
+            </header>
+
+            <form onSubmit={verifyPinAndExecute} className="p-10 space-y-8">
+              <div className="space-y-4">
+                <div className="flex justify-center gap-3">
+                  <input 
+                    ref={pinInputRef}
+                    type="password" 
+                    maxLength={4}
+                    pattern="\d*"
+                    inputMode="numeric"
+                    className={`w-40 bg-slate-50 border-2 rounded-2xl px-6 py-5 text-center text-3xl font-black tracking-[0.5em] focus:ring-4 transition-all outline-none ${
+                      pinError 
+                      ? 'border-red-500 ring-red-500/10 animate-shake text-red-500' 
+                      : 'border-slate-100 focus:border-blue-600 focus:ring-blue-500/5 text-slate-900'
+                    }`}
+                    placeholder="••••"
+                    value={pinValue}
+                    onChange={e => setPinValue(e.target.value)}
+                  />
+                </div>
+                {pinError && (
+                  <p className="text-[10px] font-black text-red-500 uppercase text-center tracking-widest animate-pulse">PIN Incorreto! Tente novamente.</p>
+                )}
+              </div>
+
+              <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100">
+                <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">Ação Pendente:</p>
+                <p className="text-xs font-bold text-slate-700 uppercase">
+                  {pendingAction?.type === 'DAY' ? 'Alteração de Dias Trabalhados' : `Pagamento de R$ ${pendingAction?.data?.amountToPay?.toFixed(2)}`}
+                </p>
+              </div>
+
+              <button 
+                type="submit" 
+                className="w-full bg-blue-600 text-white py-5 rounded-2xl font-black uppercase tracking-widest hover:bg-blue-700 transition-all shadow-xl shadow-blue-500/20 flex items-center justify-center gap-3 active:scale-95"
+              >
+                <Key size={18} /> Validar e Confirmar
+              </button>
+            </form>
+          </div>
         </div>
       )}
 
@@ -362,6 +460,17 @@ const AdminFuncionarios: React.FC<AdminFuncionariosProps> = ({ staff, setStaff }
           </div>
         </div>
       )}
+
+      <style>{`
+        @keyframes shake {
+          0%, 100% { transform: translateX(0); }
+          25% { transform: translateX(-5px); }
+          75% { transform: translateX(5px); }
+        }
+        .animate-shake {
+          animation: shake 0.2s cubic-bezier(.36,.07,.19,.97) both;
+        }
+      `}</style>
     </div>
   );
 };
