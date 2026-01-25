@@ -33,7 +33,19 @@ const App: React.FC = () => {
   const [bookings, setBookings] = useState<Booking[]>(() => getLocalData('bookings', []));
   const [staff, setStaff] = useState<StaffMember[]>(() => getLocalData('staff', []));
   const [clients, setClients] = useState<Client[]>(() => getLocalData('clients', []));
-  const [availableSlots, setAvailableSlots] = useState<AvailableSlot[]>(() => getLocalData('slots', []));
+  
+  // Inicializa os slots com os horários solicitados: 26/01/2026 às 09:30 e 11:30
+  const [availableSlots, setAvailableSlots] = useState<AvailableSlot[]>(() => {
+    const saved = getLocalData('slots', []);
+    if (saved.length === 0) {
+      return [
+        { id: 'init-slot-1', date: '2026-01-26', time: '09:30' },
+        { id: 'init-slot-2', date: '2026-01-26', time: '11:30' }
+      ];
+    }
+    return saved;
+  });
+  
   const [adminPin] = useState(() => localStorage.getItem('lavacar_admin_pin') || '1844');
 
   useEffect(() => {
