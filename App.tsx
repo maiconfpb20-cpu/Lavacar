@@ -34,16 +34,16 @@ const App: React.FC = () => {
   const [staff, setStaff] = useState<StaffMember[]>(() => getLocalData('staff', []));
   const [clients, setClients] = useState<Client[]>(() => getLocalData('clients', []));
   
-  // Inicializa os slots com os horários solicitados: 26/01/2026 às 09:30 e 11:30
+  // Inicializa os slots removendo o de 09:30 e mantendo apenas o de 11:30 conforme solicitado
   const [availableSlots, setAvailableSlots] = useState<AvailableSlot[]>(() => {
     const saved = getLocalData('slots', []);
     if (saved.length === 0) {
       return [
-        { id: 'init-slot-1', date: '2026-01-26', time: '09:30' },
         { id: 'init-slot-2', date: '2026-01-26', time: '11:30' }
       ];
     }
-    return saved;
+    // Caso o usuário queira forçar a remoção mesmo que já existam dados salvos:
+    return saved.filter((s: AvailableSlot) => !(s.date === '2026-01-26' && s.time === '09:30'));
   });
   
   const [adminPin] = useState(() => localStorage.getItem('lavacar_admin_pin') || '1844');
