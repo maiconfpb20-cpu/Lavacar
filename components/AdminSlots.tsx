@@ -1,8 +1,8 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { 
   Calendar, Clock, Plus, Trash2, CalendarCheck, ShieldCheck, 
-  Lock, Save, CheckCircle2, Key, Share2, Copy, Globe, Download, Database, HardDrive, FileJson
+  Lock, Save, CheckCircle2, Key, Share2, Copy, Globe, Download, Database, HardDrive, FileJson, Upload
 } from 'lucide-react';
 import { AvailableSlot } from '../types.ts';
 import { WASH_ID } from '../services/apiService.ts';
@@ -11,9 +11,10 @@ interface AdminSlotsProps {
   slots: AvailableSlot[];
   onAddSlot: (date: string, time: string) => void;
   onRemoveSlot: (id: string) => void;
+  onRestoreBackup: (data: any) => void;
 }
 
-const AdminSlots: React.FC<AdminSlotsProps> = ({ slots, onAddSlot, onRemoveSlot }) => {
+const AdminSlots: React.FC<AdminSlotsProps> = ({ slots, onAddSlot, onRemoveSlot, onRestoreBackup }) => {
   const [activeTab, setActiveTab] = useState<'agenda' | 'seguranca' | 'sync' | 'backup'>('agenda');
   const [date, setDate] = useState('');
   const [time, setTime] = useState('');
@@ -23,6 +24,8 @@ const AdminSlots: React.FC<AdminSlotsProps> = ({ slots, onAddSlot, onRemoveSlot 
   const [confirmPin, setConfirmPin] = useState('');
   const [pinStatus, setPinStatus] = useState<'idle' | 'success' | 'error'>('idle');
   const [copySuccess, setCopySuccess] = useState(false);
+  
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     const savedPin = localStorage.getItem('lavacar_admin_pin') || '1844';
@@ -56,10 +59,10 @@ const AdminSlots: React.FC<AdminSlotsProps> = ({ slots, onAddSlot, onRemoveSlot 
 
   const downloadBackup = () => {
     const backupData = {
-      bookings: JSON.parse(localStorage.getItem(`lavacar_cache_${WASH_ID}_bookings`) || '[]'),
-      staff: JSON.parse(localStorage.getItem(`lavacar_cache_${WASH_ID}_staff`) || '[]'),
-      clients: JSON.parse(localStorage.getItem(`lavacar_cache_${WASH_ID}_clients`) || '[]'),
-      slots: JSON.parse(localStorage.getItem(`lavacar_cache_${WASH_ID}_slots`) || '[]'),
+      bookings: JSON.parse(localStorage.getItem(`lavacar_local_db_bookings`) || '[]'),
+      staff: JSON.parse(localStorage.getItem(`lavacar_local_db_staff`) || '[]'),
+      clients: JSON.parse(localStorage.getItem(`lavacar_local_db_clients`) || '[]'),
+      slots: JSON.parse(localStorage.getItem(`lavacar_local_db_slots`) || '[]'),
       adminPin: localStorage.getItem('lavacar_admin_pin') || '1844',
       exportDate: new Date().toISOString()
     };
@@ -72,6 +75,25 @@ const AdminSlots: React.FC<AdminSlotsProps> = ({ slots, onAddSlot, onRemoveSlot 
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
+  };
+
+  const handleImportBackup = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const json = JSON.parse(e.target?.result as string);
+        if (confirm('Atenção: Restaurar este backup substituirá todos os dados atuais do sistema. Deseja continuar?')) {
+          onRestoreBackup(json);
+        }
+      } catch (err) {
+        alert('Erro ao ler o arquivo de backup. Certifique-se de que é um arquivo JSON válido exportado pelo LavaCar Pro.');
+      }
+    };
+    reader.readAsText(file);
+    if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
   return (
@@ -96,15 +118,15 @@ const AdminSlots: React.FC<AdminSlotsProps> = ({ slots, onAddSlot, onRemoveSlot 
       </header>
 
       {activeTab === 'backup' && (
-        <div className="max-w-xl animate-in fade-in slide-in-from-bottom-4 duration-300">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-8 animate-in fade-in slide-in-from-bottom-4 duration-300">
           <div className="bg-white p-10 rounded-[2.5rem] shadow-sm border border-slate-100">
             <div className="flex items-center gap-4 mb-8">
               <div className="w-14 h-14 bg-emerald-600 rounded-2xl flex items-center justify-center text-white shadow-xl shadow-emerald-500/20">
-                <HardDrive size={28} />
+                <Download size={28} />
               </div>
               <div>
-                <h3 className="text-xl font-black text-slate-800 uppercase tracking-tight">Download de Dados</h3>
-                <p className="text-slate-400 text-xs font-bold uppercase tracking-widest mt-1">Sincronize com seu PC pessoal</p>
+                <h3 className="text-xl font-black text-slate-800 uppercase tracking-tight">Exportar Dados</h3>
+                <p className="text-slate-400 text-xs font-bold uppercase tracking-widest mt-1">Baixe para seu PC pessoal</p>
               </div>
             </div>
 
@@ -115,8 +137,8 @@ const AdminSlots: React.FC<AdminSlotsProps> = ({ slots, onAddSlot, onRemoveSlot 
                     <Database size={20} />
                   </div>
                   <div>
-                    <p className="text-sm font-bold text-slate-800">Exportar Banco de Dados</p>
-                    <p className="text-xs text-slate-500 mt-1">Baixe um arquivo contendo todos os agendamentos, lista de clientes e histórico financeiro.</p>
+                    <p className="text-sm font-bold text-slate-800">Cópia de Segurança</p>
+                    <p className="text-xs text-slate-500 mt-1">Baixe todos os agendamentos, clientes e histórico em um arquivo único.</p>
                   </div>
                 </div>
               </div>
@@ -124,19 +146,60 @@ const AdminSlots: React.FC<AdminSlotsProps> = ({ slots, onAddSlot, onRemoveSlot 
               <div className="p-6 bg-blue-50 rounded-3xl border border-blue-100 flex items-center justify-between">
                 <div className="flex items-center gap-3">
                   <FileJson className="text-blue-600" size={24} />
-                  <span className="text-[10px] font-black text-blue-800 uppercase tracking-widest">Formato JSON Profissional</span>
+                  <span className="text-[10px] font-black text-blue-800 uppercase tracking-widest">Formato JSON</span>
                 </div>
                 <button 
                   onClick={downloadBackup}
                   className="bg-blue-600 text-white px-6 py-3 rounded-xl font-black text-[10px] uppercase tracking-widest flex items-center gap-2 hover:bg-blue-700 transition-all shadow-lg shadow-blue-600/20 active:scale-95"
                 >
-                  <Download size={16} /> Baixar Agora
+                  <Download size={16} /> Baixar
                 </button>
               </div>
+            </div>
+          </div>
 
-              <div className="pt-4 flex items-center gap-2 text-slate-400">
-                <CheckCircle2 size={14} className="text-emerald-500" />
-                <p className="text-[9px] font-bold uppercase tracking-widest">Os dados salvos no PC podem ser restaurados a qualquer momento.</p>
+          <div className="bg-white p-10 rounded-[2.5rem] shadow-sm border border-slate-100">
+            <div className="flex items-center gap-4 mb-8">
+              <div className="w-14 h-14 bg-blue-600 rounded-2xl flex items-center justify-center text-white shadow-xl shadow-blue-500/20">
+                <Upload size={28} />
+              </div>
+              <div>
+                <h3 className="text-xl font-black text-slate-800 uppercase tracking-tight">Restaurar Dados</h3>
+                <p className="text-slate-400 text-xs font-bold uppercase tracking-widest mt-1">Sincronize outro dispositivo</p>
+              </div>
+            </div>
+
+            <div className="space-y-6">
+              <div className="bg-slate-50 p-6 rounded-3xl border border-slate-100">
+                <div className="flex items-start gap-4">
+                  <div className="bg-white p-3 rounded-xl text-orange-600 shadow-sm">
+                    <HardDrive size={20} />
+                  </div>
+                  <div>
+                    <p className="text-sm font-bold text-slate-800">Importar Arquivo</p>
+                    <p className="text-xs text-slate-500 mt-1">Selecione o arquivo gerado em outro dispositivo para atualizar este painel.</p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="p-6 bg-slate-50 rounded-3xl border border-slate-100 flex items-center justify-between">
+                <input 
+                  type="file" 
+                  accept=".json" 
+                  className="hidden" 
+                  ref={fileInputRef} 
+                  onChange={handleImportBackup} 
+                />
+                <div className="flex items-center gap-3">
+                  <Database className="text-slate-400" size={24} />
+                  <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Selecione o .json</span>
+                </div>
+                <button 
+                  onClick={() => fileInputRef.current?.click()}
+                  className="bg-slate-900 text-white px-6 py-3 rounded-xl font-black text-[10px] uppercase tracking-widest flex items-center gap-2 hover:bg-slate-800 transition-all shadow-lg active:scale-95"
+                >
+                  <Upload size={16} /> Selecionar
+                </button>
               </div>
             </div>
           </div>

@@ -34,7 +34,6 @@ const App: React.FC = () => {
   const [staff, setStaff] = useState<StaffMember[]>(() => getLocalData('staff', []));
   const [clients, setClients] = useState<Client[]>(() => getLocalData('clients', []));
   
-  // Inicializa os slots removendo o de 09:30 e mantendo apenas o de 11:30 conforme solicitado
   const [availableSlots, setAvailableSlots] = useState<AvailableSlot[]>(() => {
     const saved = getLocalData('slots', []);
     if (saved.length === 0) {
@@ -42,11 +41,10 @@ const App: React.FC = () => {
         { id: 'init-slot-2', date: '2026-01-26', time: '11:30' }
       ];
     }
-    // Caso o usuário queira forçar a remoção mesmo que já existam dados salvos:
     return saved.filter((s: AvailableSlot) => !(s.date === '2026-01-26' && s.time === '09:30'));
   });
   
-  const [adminPin] = useState(() => localStorage.getItem('lavacar_admin_pin') || '1844');
+  const [adminPin, setAdminPin] = useState(() => localStorage.getItem('lavacar_admin_pin') || '1844');
 
   useEffect(() => {
     const handleOnline = () => setIsOnline(true);
@@ -86,6 +84,18 @@ const App: React.FC = () => {
     }, 30000);
     return () => clearInterval(interval);
   }, [isOnline, syncWithCloud]);
+
+  const handleRestoreBackup = (data: any) => {
+    if (data.bookings) setBookings(data.bookings);
+    if (data.staff) setStaff(data.staff);
+    if (data.clients) setClients(data.clients);
+    if (data.slots) setAvailableSlots(data.slots);
+    if (data.adminPin) {
+      setAdminPin(data.adminPin);
+      localStorage.setItem('lavacar_admin_pin', data.adminPin);
+    }
+    alert('Backup restaurado com sucesso!');
+  };
 
   const addBooking = (newBooking: Omit<Booking, 'id' | 'status' | 'createdAt'>) => {
     const booking: Booking = {
@@ -146,7 +156,7 @@ const App: React.FC = () => {
       case MenuSection.Clientes: return <AdminClientes clients={clients} onAddClient={addClient} />;
       case MenuSection.Veiculos: return <AdminVeiculos bookings={bookings} />;
       case MenuSection.Financeiro: return <AdminFinanceiro bookings={bookings} />;
-      case MenuSection.Configuracoes: return <AdminSlots slots={availableSlots} onAddSlot={addAvailableSlot} onRemoveSlot={removeAvailableSlot} />;
+      case MenuSection.Configuracoes: return <AdminSlots slots={availableSlots} onAddSlot={addAvailableSlot} onRemoveSlot={removeAvailableSlot} onRestoreBackup={handleRestoreBackup} />;
       default: return null;
     }
   };
