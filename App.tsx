@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import Sidebar from './components/Sidebar.tsx';
 import Dashboard from './components/Dashboard.tsx';
 import CustomerPortal from './components/CustomerPortal.tsx';
@@ -14,8 +14,8 @@ import AdminFinanceiro from './components/AdminFinanceiro.tsx';
 import Login from './components/Login.tsx';
 import AIChat from './components/AIChat.tsx';
 import { MenuSection, Booking, BookingStatus, AvailableSlot, StaffMember, Client } from './types.ts';
-import { Menu, X, Lock, Cloud, CloudOff, RefreshCw } from 'lucide-react';
-import { fetchDataFromCloud, syncDataToCloud, WashData, WASH_ID } from './services/apiService.ts';
+import { Menu, X, Lock, Cloud, RefreshCw, Wifi, WifiOff } from 'lucide-react';
+import { syncDataToCloud, WashData, WASH_ID } from './services/apiService.ts';
 
 const App: React.FC = () => {
   const [activeSection, setActiveSection] = useState<MenuSection>(MenuSection.Dashboard);
@@ -23,73 +23,39 @@ const App: React.FC = () => {
   const [viewMode, setViewMode] = useState<'admin' | 'customer' | 'login'>('customer');
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
-  const [syncError, setSyncError] = useState(false);
-  const [initialLoadDone, setInitialLoadDone] = useState(false);
+  const [isOnline, setIsOnline] = useState(navigator.onLine);
 
-  // Carrega dados iniciais do LocalStorage para evitar tela vazia
-  const getInitialData = (key: string, defaultValue: any) => {
-    const saved = localStorage.getItem(`lavacar_cache_${WASH_ID}_${key}`);
+  const getLocalData = (key: string, defaultValue: any) => {
+    const saved = localStorage.getItem(`lavacar_local_db_${key}`);
     return saved ? JSON.parse(saved) : defaultValue;
   };
 
-  const [bookings, setBookings] = useState<Booking[]>(() => getInitialData('bookings', []));
-  const [staff, setStaff] = useState<StaffMember[]>(() => getInitialData('staff', []));
-  const [clients, setClients] = useState<Client[]>(() => getInitialData('clients', []));
-  const [availableSlots, setAvailableSlots] = useState<AvailableSlot[]>(() => getInitialData('slots', []));
-  const [adminPin, setAdminPin] = useState(() => localStorage.getItem('lavacar_admin_pin') || '1844');
-
-  const skipSyncRef = useRef(true);
-
-  // Salva no LocalStorage sempre que mudar (Cache de segurança)
-  useEffect(() => {
-    if (!initialLoadDone) return;
-    localStorage.setItem(`lavacar_cache_${WASH_ID}_bookings`, JSON.stringify(bookings));
-    localStorage.setItem(`lavacar_cache_${WASH_ID}_staff`, JSON.stringify(staff));
-    localStorage.setItem(`lavacar_cache_${WASH_ID}_clients`, JSON.stringify(clients));
-    localStorage.setItem(`lavacar_cache_${WASH_ID}_slots`, JSON.stringify(availableSlots));
-  }, [bookings, staff, clients, availableSlots, initialLoadDone]);
-
-  // Carregamento de Dados da Nuvem
-  const loadData = useCallback(async (isAuto = true) => {
-    if (isSyncing && isAuto) return;
-    
-    setIsSyncing(true);
-    try {
-      const cloudData = await fetchDataFromCloud();
-      
-      if (cloudData) {
-        skipSyncRef.current = true; 
-        setBookings(cloudData.bookings || []);
-        setStaff(cloudData.staff || []);
-        setClients(cloudData.clients || []);
-        setAvailableSlots(cloudData.availableSlots || []);
-        if (cloudData.adminPin) {
-          setAdminPin(cloudData.adminPin);
-          localStorage.setItem('lavacar_admin_pin', cloudData.adminPin);
-        }
-        setInitialLoadDone(true);
-        setSyncError(false);
-      } else {
-        // Se a nuvem estiver vazia mas tivermos dados locais, consideramos o inicialDone para permitir o primeiro upload
-        setInitialLoadDone(true);
-      }
-    } catch (e) {
-      setSyncError(true);
-    } finally {
-      setIsSyncing(false);
-    }
-  }, [isSyncing]);
+  const [bookings, setBookings] = useState<Booking[]>(() => getLocalData('bookings', []));
+  const [staff, setStaff] = useState<StaffMember[]>(() => getLocalData('staff', []));
+  const [clients, setClients] = useState<Client[]>(() => getLocalData('clients', []));
+  const [availableSlots, setAvailableSlots] = useState<AvailableSlot[]>(() => getLocalData('slots', []));
+  const [adminPin] = useState(() => localStorage.getItem('lavacar_admin_pin') || '1844');
 
   useEffect(() => {
-    loadData(false);
-    const interval = setInterval(() => loadData(true), 15000);
-    return () => clearInterval(interval);
+    const handleOnline = () => setIsOnline(true);
+    const handleOffline = () => setIsOnline(false);
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
   }, []);
 
-  // Sincronização de saída (Só acontece se o load inicial foi concluído)
-  const syncAll = useCallback(async () => {
-    if (!initialLoadDone) return;
-    
+  useEffect(() => {
+    localStorage.setItem(`lavacar_local_db_bookings`, JSON.stringify(bookings));
+    localStorage.setItem(`lavacar_local_db_staff`, JSON.stringify(staff));
+    localStorage.setItem(`lavacar_local_db_clients`, JSON.stringify(clients));
+    localStorage.setItem(`lavacar_local_db_slots`, JSON.stringify(availableSlots));
+  }, [bookings, staff, clients, availableSlots]);
+
+  const syncWithCloud = useCallback(async () => {
+    if (!navigator.onLine) return;
     setIsSyncing(true);
     const data: WashData = {
       bookings,
@@ -98,25 +64,17 @@ const App: React.FC = () => {
       availableSlots,
       adminPin: localStorage.getItem('lavacar_admin_pin') || adminPin
     };
-    
-    const success = await syncDataToCloud(data);
-    setSyncError(!success);
+    await syncDataToCloud(data);
     setIsSyncing(false);
-  }, [bookings, staff, clients, availableSlots, adminPin, initialLoadDone]);
+  }, [bookings, staff, clients, availableSlots, adminPin]);
 
   useEffect(() => {
-    if (skipSyncRef.current) {
-      skipSyncRef.current = false;
-      return;
-    }
+    const interval = setInterval(() => {
+      if (isOnline) syncWithCloud();
+    }, 30000);
+    return () => clearInterval(interval);
+  }, [isOnline, syncWithCloud]);
 
-    const timer = setTimeout(() => {
-      syncAll();
-    }, 2000);
-    return () => clearTimeout(timer);
-  }, [bookings, staff, clients, availableSlots, adminPin, syncAll]);
-
-  // Handlers
   const addBooking = (newBooking: Omit<Booking, 'id' | 'status' | 'createdAt'>) => {
     const booking: Booking = {
       ...newBooking,
@@ -196,51 +154,47 @@ const App: React.FC = () => {
   }
 
   return (
-    <div className="flex min-h-screen bg-[#f8fafc] overflow-hidden relative font-['Inter']">
+    <div className="flex h-screen w-screen bg-[#f8fafc] overflow-hidden relative font-['Inter']">
       <div className={`fixed inset-y-0 left-0 z-40 transform transition-transform duration-300 ease-in-out lg:relative lg:translate-x-0 ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full lg:hidden'}`}>
         <Sidebar activeSection={activeSection} onSectionChange={(s) => { setActiveSection(s); if (window.innerWidth < 1024) setIsSidebarOpen(false); }} onLogout={handleLogout} />
       </div>
       
-      <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
-        <header className="h-16 flex items-center justify-between px-6 bg-white border-b border-slate-100">
+      <div className="flex-1 flex flex-col min-w-0 h-full overflow-hidden">
+        <header className="h-16 flex flex-shrink-0 items-center justify-between px-6 bg-white border-b border-slate-100 z-20">
           <div className="flex items-center gap-4">
             <button onClick={() => setIsSidebarOpen(!isSidebarOpen)} className="p-2 rounded-xl bg-slate-50 text-slate-600 hover:text-blue-600 transition-colors">
               {isSidebarOpen ? <X size={20} /> : <Menu size={20} />}
             </button>
             <div className="hidden sm:flex items-center gap-2">
               <span className="text-sm font-black text-slate-800 uppercase tracking-tight">LavaCar Pro</span>
-              <span className="text-slate-200">/</span>
-              <span className="text-xs font-black text-blue-600 uppercase tracking-widest">{activeSection}</span>
+              <span className="bg-emerald-100 text-emerald-600 text-[9px] font-black px-2 py-0.5 rounded-md uppercase">Modo PC</span>
             </div>
           </div>
 
           <div className="flex items-center gap-6">
-            <button 
-              onClick={() => loadData(false)}
-              className="flex items-center gap-2 px-3 py-1.5 bg-slate-50 rounded-full border border-slate-100 hover:bg-slate-100 transition-colors active:scale-95"
-            >
-              {isSyncing ? (
-                <RefreshCw size={14} className="text-blue-500 animate-spin" />
-              ) : syncError ? (
-                <CloudOff size={14} className="text-red-500" />
+            <div className="flex items-center gap-2 px-3 py-1.5 bg-slate-50 rounded-full border border-slate-100">
+              {isOnline ? (
+                <><Wifi size={14} className="text-emerald-500" /> <span className="text-[9px] font-black uppercase text-slate-400">Online-Ready</span></>
               ) : (
-                <Cloud size={14} className="text-emerald-500" />
+                <><WifiOff size={14} className="text-orange-500" /> <span className="text-[9px] font-black uppercase text-orange-400">Salvando Localmente</span></>
               )}
-              <span className="text-[9px] font-black uppercase tracking-widest text-slate-400">
-                {isSyncing ? 'Sincronizando...' : 'Nuvem Conectada'}
-              </span>
+            </div>
+
+            <button 
+              onClick={syncWithCloud}
+              className="flex items-center gap-2 px-3 py-1.5 bg-blue-50 rounded-full border border-blue-100 hover:bg-blue-100 transition-all"
+            >
+              {isSyncing ? <RefreshCw size={14} className="text-blue-500 animate-spin" /> : <Cloud size={14} className="text-blue-500" />}
+              <span className="text-[9px] font-black uppercase tracking-widest text-blue-600">Sinc. Nuvem</span>
             </button>
 
-            <button onClick={() => setViewMode('customer')} className="hidden md:block text-slate-400 hover:text-slate-600 text-[10px] font-black uppercase tracking-[0.2em]">
-              Portal do Cliente
-            </button>
             <div className="w-9 h-9 rounded-2xl bg-slate-50 border border-slate-100 flex items-center justify-center text-slate-400">
               <Lock size={14} />
             </div>
           </div>
         </header>
 
-        <main className="flex-1 overflow-y-auto bg-[#f8fafc]">
+        <main className="flex-1 overflow-y-auto overflow-x-hidden bg-[#f8fafc] custom-scrollbar pb-20">
           {renderAdminContent()}
         </main>
       </div>

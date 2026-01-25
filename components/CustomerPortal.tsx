@@ -128,6 +128,29 @@ const CustomerPortal: React.FC<CustomerPortalProps> = ({ onAddBooking, onGoToLog
       condition: `[Nível: ${dirtLevel}] ${formData.condition}`,
       price: finalPrice 
     });
+
+    const businessPhone = "5541992734041";
+    const formattedDate = new Date(formData.date + 'T00:00:00').toLocaleDateString('pt-BR');
+    
+    const message = `Olá! Acabei de realizar um agendamento pelo portal. Seguem os detalhes:
+
+📋 *DADOS DO AGENDAMENTO*
+👤 *Cliente:* ${formData.customerName}
+📱 *WhatsApp:* ${formData.phone}
+🚗 *Veículo:* ${formData.carBrand} ${formData.carModel} (${formData.category})
+🔢 *Placa:* ${formData.plate.toUpperCase()}
+📦 *Serviço:* ${fullService}
+🧼 *Nível de Sujeira:* ${formData.dirtLevel}
+📅 *Data:* ${formattedDate}
+⏰ *Horário:* ${formData.time}
+💰 *Valor Total:* R$ ${finalPrice.toFixed(2)}
+
+📝 *Observações:* ${formData.condition}`;
+
+    const encodedMessage = encodeURIComponent(message);
+    const whatsappUrl = `https://api.whatsapp.com/send?phone=${businessPhone}&text=${encodedMessage}`;
+    
+    window.open(whatsappUrl, '_blank');
     setStep(4);
   };
 
@@ -182,22 +205,23 @@ const CustomerPortal: React.FC<CustomerPortalProps> = ({ onAddBooking, onGoToLog
 
   if (step === 4) {
     return (
-      <div className="min-h-screen bg-white flex flex-col items-center justify-center p-6 text-center animate-in fade-in zoom-in duration-500">
+      <div className="h-screen w-screen bg-white flex flex-col items-center justify-center p-6 text-center animate-in fade-in zoom-in duration-500 overflow-y-auto custom-scrollbar">
         <div className="bg-emerald-100 text-emerald-600 p-6 rounded-full mb-6">
           <CheckCircle size={64} />
         </div>
-        <h2 className="text-3xl font-bold text-slate-800 mb-2">Agendamento Confirmado!</h2>
-        <p className="text-slate-500 mb-8 max-w-md">
-          Obrigado, {formData.customerName.split(' ')[0]}! Recebemos seu pedido para o {formData.carModel}.
+        <h2 className="text-3xl font-bold text-slate-800 mb-2">Agendamento Realizado!</h2>
+        <p className="text-slate-500 mb-4 max-w-md">
+          Obrigado, {formData.customerName.split(' ')[0]}! Abrimos o seu WhatsApp para que você possa nos enviar os detalhes do serviço.
         </p>
+        <p className="text-slate-400 text-xs mb-8 uppercase font-bold tracking-widest">Aguardamos você no horário marcado!</p>
         <button onClick={() => { setFormData({ ...formData, date: '', time: '', carBrand: '', carModel: '', plate: '', condition: '', service: '', basePrice: 0, category: '', hasCera: false }); setStep(1); }} className="bg-blue-600 text-white px-8 py-3 rounded-xl font-bold hover:bg-blue-700 transition-colors shadow-lg shadow-blue-600/20">Novo Agendamento</button>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 flex flex-col">
-      <header className="bg-white border-b p-4 flex justify-between items-center sticky top-0 z-10 shadow-sm">
+    <div className="h-screen w-screen bg-slate-50 flex flex-col overflow-y-auto custom-scrollbar">
+      <header className="bg-white border-b p-4 flex justify-between items-center sticky top-0 z-50 shadow-sm">
         <div className="flex items-center gap-2">
           <div className="bg-blue-600 p-2 rounded-lg">
              <Droplets className="text-white" size={20} />
@@ -323,7 +347,6 @@ const CustomerPortal: React.FC<CustomerPortalProps> = ({ onAddBooking, onGoToLog
               </h3>
 
               <div className="space-y-6">
-                {/* AVISO LEGAL IMPORTANTE */}
                 <div className="bg-amber-50 border-2 border-amber-200 p-4 rounded-2xl flex items-start gap-4">
                   <div className="bg-amber-100 p-2 rounded-xl text-amber-600">
                     <AlertTriangle size={24} />
@@ -336,7 +359,6 @@ const CustomerPortal: React.FC<CustomerPortalProps> = ({ onAddBooking, onGoToLog
                   </div>
                 </div>
 
-                {/* Intensidade da Sujeira */}
                 <div className="space-y-2">
                   <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Nível de Sujeira</label>
                   <div className="grid grid-cols-3 gap-3">
@@ -362,7 +384,6 @@ const CustomerPortal: React.FC<CustomerPortalProps> = ({ onAddBooking, onGoToLog
                   </div>
                 </div>
 
-                {/* Observações */}
                 <div className="space-y-3">
                   <div className="relative">
                     <FileText className="absolute left-4 top-4 text-slate-400" size={18} />
@@ -382,7 +403,6 @@ const CustomerPortal: React.FC<CustomerPortalProps> = ({ onAddBooking, onGoToLog
                     )}
                   </div>
 
-                  {/* Preenchimento Rápido */}
                   <div className="flex flex-wrap gap-2">
                     {QUICK_OBS.map(obs => (
                       <button 
@@ -400,10 +420,10 @@ const CustomerPortal: React.FC<CustomerPortalProps> = ({ onAddBooking, onGoToLog
             </section>
 
             {/* Passo 5: Agenda Inteligente */}
-            <section className="bg-white p-6 rounded-3xl shadow-sm border border-slate-100 overflow-hidden">
+            <section className="bg-white p-6 rounded-3xl shadow-sm border border-slate-100">
               <h3 className="flex items-center gap-2 font-bold text-slate-800 mb-5"><div className="w-8 h-8 rounded-xl bg-blue-600 text-white flex items-center justify-center text-xs font-black shadow-lg shadow-blue-500/20">5</div>Escolha o Melhor Horário</h3>
               <div className="space-y-8">
-                <div className="flex gap-3 overflow-x-auto pb-4 scrollbar-hide -mx-2 px-2">
+                <div className="flex gap-3 overflow-x-auto pb-4 scrollbar-hide -mx-2 px-2 custom-scrollbar">
                   {availableDates.map(dateStr => {
                     const { day, weekday, month } = getDayDetails(dateStr);
                     const selected = formData.date === dateStr;

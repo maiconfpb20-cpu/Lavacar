@@ -47,9 +47,9 @@ const AdminAgendamentos: React.FC<AdminAgendamentosProps> = ({ bookings, onUpdat
         </div>
       </header>
 
-      <div className="bg-white rounded-[2.5rem] shadow-sm overflow-hidden border border-slate-100">
-        <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse">
+      <div className="bg-white rounded-[2.5rem] shadow-sm border border-slate-100 overflow-hidden">
+        <div className="overflow-x-auto custom-scrollbar">
+          <table className="w-full text-left border-collapse min-w-[800px]">
             <thead>
               <tr className="border-b border-slate-50">
                 <th className="px-6 py-5 text-xs font-black text-slate-400 uppercase tracking-widest">Cliente / Veículo</th>
