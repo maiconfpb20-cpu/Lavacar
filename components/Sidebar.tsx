@@ -11,7 +11,8 @@ import {
   LogOut,
   Droplet,
   Settings,
-  UserCheck
+  UserCheck,
+  TrendingDown
 } from 'lucide-react';
 import { MenuSection } from '../types';
 
@@ -30,6 +31,7 @@ const Sidebar: React.FC<SidebarProps> = ({ activeSection, onSectionChange, onLog
     { id: MenuSection.Funcionarios, label: 'Funcionários', icon: <UserCheck size={20} /> },
     { id: MenuSection.Clientes, label: 'Clientes', icon: <Users size={20} /> },
     { id: MenuSection.Veiculos, label: 'Veículos', icon: <Car size={20} /> },
+    { id: MenuSection.Gastos, label: 'Gastos', icon: <TrendingDown size={20} /> },
     { id: MenuSection.Financeiro, label: 'Financeiro', icon: <Wallet size={20} /> },
     { id: MenuSection.Configuracoes, label: 'Configurações', icon: <Settings size={20} /> },
   ];

@@ -11,9 +11,10 @@ import AdminHistorico from './components/AdminHistorico.tsx';
 import AdminFuncionarios from './components/AdminFuncionarios.tsx';
 import AdminClientes from './components/AdminClientes.tsx';
 import AdminFinanceiro from './components/AdminFinanceiro.tsx';
+import AdminGastos from './components/AdminGastos.tsx';
 import Login from './components/Login.tsx';
 import AIChat from './components/AIChat.tsx';
-import { MenuSection, Booking, BookingStatus, AvailableSlot, StaffMember, Client } from './types.ts';
+import { MenuSection, Booking, BookingStatus, AvailableSlot, StaffMember, Client, Expense } from './types.ts';
 import { Menu, X, Lock, Cloud, RefreshCw, Wifi, WifiOff } from 'lucide-react';
 import { syncDataToCloud, WashData, WASH_ID } from './services/apiService.ts';
 
@@ -33,6 +34,7 @@ const App: React.FC = () => {
   const [bookings, setBookings] = useState<Booking[]>(() => getLocalData('bookings', []));
   const [staff, setStaff] = useState<StaffMember[]>(() => getLocalData('staff', []));
   const [clients, setClients] = useState<Client[]>(() => getLocalData('clients', []));
+  const [expenses, setExpenses] = useState<Expense[]>(() => getLocalData('expenses', []));
   
   const [availableSlots, setAvailableSlots] = useState<AvailableSlot[]>(() => {
     const saved = getLocalData('slots', []);
@@ -62,7 +64,8 @@ const App: React.FC = () => {
     localStorage.setItem(`lavacar_local_db_staff`, JSON.stringify(staff));
     localStorage.setItem(`lavacar_local_db_clients`, JSON.stringify(clients));
     localStorage.setItem(`lavacar_local_db_slots`, JSON.stringify(availableSlots));
-  }, [bookings, staff, clients, availableSlots]);
+    localStorage.setItem(`lavacar_local_db_expenses`, JSON.stringify(expenses));
+  }, [bookings, staff, clients, availableSlots, expenses]);
 
   const syncWithCloud = useCallback(async () => {
     if (!navigator.onLine) return;
@@ -72,11 +75,12 @@ const App: React.FC = () => {
       staff,
       clients,
       availableSlots,
-      adminPin: localStorage.getItem('lavacar_admin_pin') || adminPin
+      adminPin: localStorage.getItem('lavacar_admin_pin') || adminPin,
+      expenses
     };
     await syncDataToCloud(data);
     setIsSyncing(false);
-  }, [bookings, staff, clients, availableSlots, adminPin]);
+  }, [bookings, staff, clients, availableSlots, adminPin, expenses]);
 
   useEffect(() => {
     const interval = setInterval(() => {
@@ -90,6 +94,7 @@ const App: React.FC = () => {
     if (data.staff) setStaff(data.staff);
     if (data.clients) setClients(data.clients);
     if (data.slots) setAvailableSlots(data.slots);
+    if (data.expenses) setExpenses(data.expenses);
     if (data.adminPin) {
       setAdminPin(data.adminPin);
       localStorage.setItem('lavacar_admin_pin', data.adminPin);
@@ -136,6 +141,19 @@ const App: React.FC = () => {
     setAvailableSlots(prev => prev.filter(s => s.id !== id));
   };
 
+  const addExpense = (expense: Omit<Expense, 'id' | 'createdAt'>) => {
+    const newExpense: Expense = {
+      ...expense,
+      id: Math.random().toString(36).substr(2, 9),
+      createdAt: new Date()
+    };
+    setExpenses(prev => [...prev, newExpense]);
+  };
+
+  const removeExpense = (id: string) => {
+    setExpenses(prev => prev.filter(e => e.id !== id));
+  };
+
   const handleLoginSuccess = () => {
     setIsAuthenticated(true);
     setViewMode('admin');
@@ -155,7 +173,8 @@ const App: React.FC = () => {
       case MenuSection.Funcionarios: return <AdminFuncionarios staff={staff} setStaff={setStaff} />;
       case MenuSection.Clientes: return <AdminClientes clients={clients} onAddClient={addClient} />;
       case MenuSection.Veiculos: return <AdminVeiculos bookings={bookings} />;
-      case MenuSection.Financeiro: return <AdminFinanceiro bookings={bookings} />;
+      case MenuSection.Gastos: return <AdminGastos expenses={expenses} onAddExpense={addExpense} onRemoveExpense={removeExpense} />;
+      case MenuSection.Financeiro: return <AdminFinanceiro bookings={bookings} expenses={expenses} />;
       case MenuSection.Configuracoes: return <AdminSlots slots={availableSlots} onAddSlot={addAvailableSlot} onRemoveSlot={removeAvailableSlot} onRestoreBackup={handleRestoreBackup} />;
       default: return null;
     }

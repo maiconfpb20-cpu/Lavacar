@@ -9,6 +9,7 @@ export enum MenuSection {
   Funcionarios = 'Funcionários',
   Clientes = 'Clientes',
   Veiculos = 'Veículos',
+  Gastos = 'Gastos',
   Financeiro = 'Financeiro',
   Configuracoes = 'Configurações'
 }
@@ -31,6 +32,17 @@ export interface Booking {
   time: string;
   price: number;
   status: BookingStatus;
+  createdAt: Date;
+}
+
+export interface Expense {
+  id: string;
+  description: string;
+  category: 'Insumos' | 'Manutenção' | 'Contas' | 'Marketing' | 'Crédito em Loja' | 'Outros';
+  amount: number;
+  date: string;
+  dueDate?: string;
+  status: 'Pago' | 'Pendente';
   createdAt: Date;
 }
 
@@ -58,6 +70,7 @@ export interface StaffMember {
   role: string;
   status: 'Ativo' | 'Em Pausa';
   email: string;
+  pixKey?: string;
   dailyRate: number;
   workedDays: number;
   totalPaid: number;

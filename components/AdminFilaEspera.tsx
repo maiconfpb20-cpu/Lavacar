@@ -1,9 +1,9 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Booking, BookingStatus, VEHICLE_DATABASE, BRANDS, VehicleCategory } from '../types';
 import { 
   Clock, Play, CheckCircle, Car, User, AlertTriangle, 
-  Plus, X, Save, Phone, Tag, Search, ChevronDown, MessageCircle, ExternalLink, Sparkles, Droplets, AlertCircle
+  Plus, X, Save, Phone, Tag, Search, ChevronDown, MessageCircle, ExternalLink, Sparkles, Droplets, AlertCircle, DollarSign, Wrench
 } from 'lucide-react';
 
 interface AdminFilaEsperaProps {
@@ -11,6 +11,14 @@ interface AdminFilaEsperaProps {
   onUpdateStatus: (id: string, status: BookingStatus) => void;
   onAddBooking: (booking: Omit<Booking, 'id' | 'status' | 'createdAt'>) => void;
 }
+
+const CATEGORY_PRICES: Record<VehicleCategory, { completa: number; interna: number }> = {
+  'SUV': { completa: 85, interna: 40 },
+  'CAMINHONETE': { completa: 100, interna: 50 },
+  'SEDA': { completa: 75, interna: 35 },
+  'Hatch': { completa: 65, interna: 30 },
+  'Moto': { completa: 45, interna: 20 },
+};
 
 const AdminFilaEspera: React.FC<AdminFilaEsperaProps> = ({ bookings, onUpdateStatus, onAddBooking }) => {
   const activeBookings = bookings.filter(b => b.status === 'Pendente' || b.status === 'Em Andamento');
@@ -24,7 +32,7 @@ const AdminFilaEspera: React.FC<AdminFilaEsperaProps> = ({ bookings, onUpdateSta
     category: '' as VehicleCategory | '',
     plate: '',
     service: 'LAVAGEM COMPLETA',
-    price: 65,
+    price: '',
     condition: '',
     dirtLevel: 'Normal' as 'Leve' | 'Normal' | 'Pesada',
     date: new Date().toISOString().split('T')[0],
@@ -36,9 +44,18 @@ const AdminFilaEspera: React.FC<AdminFilaEsperaProps> = ({ bookings, onUpdateSta
 
   const filteredBrands = BRANDS.filter(b => b.toLowerCase().includes(brandSearch.toLowerCase()));
 
+  // Sugerir preço quando mudar categoria ou serviço
+  useEffect(() => {
+    if (formData.category && formData.service) {
+      const type = formData.service.includes('COMPLETA') ? 'completa' : 'interna';
+      const suggestedPrice = CATEGORY_PRICES[formData.category as VehicleCategory][type];
+      setFormData(prev => ({ ...prev, price: suggestedPrice.toString() }));
+    }
+  }, [formData.category, formData.service]);
+
   const handleManualAdd = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!formData.customerName || !formData.plate || !formData.category || !formData.condition) return;
+    if (!formData.customerName || !formData.plate || !formData.category || !formData.condition || !formData.price) return;
     
     onAddBooking({
       ...formData,
@@ -56,7 +73,7 @@ const AdminFilaEspera: React.FC<AdminFilaEsperaProps> = ({ bookings, onUpdateSta
       category: '',
       plate: '',
       service: 'LAVAGEM COMPLETA',
-      price: 65,
+      price: '',
       condition: '',
       dirtLevel: 'Normal',
       date: new Date().toISOString().split('T')[0],
@@ -101,6 +118,10 @@ const AdminFilaEspera: React.FC<AdminFilaEsperaProps> = ({ bookings, onUpdateSta
               <div className="p-6 space-y-5 flex-1">
                 <div className="space-y-1"><p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Nome do Cliente</p><div className="flex items-center gap-2"><User size={16} className="text-blue-600" /><p className="text-sm font-black text-slate-800 uppercase tracking-tight">{booking.customerName}</p></div></div>
                 <div className="space-y-1"><p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Carro</p><div className="flex items-center gap-3 bg-slate-50 p-3 rounded-2xl border border-slate-100"><Car size={20} className="text-slate-400" /><div><p className="text-xs font-black text-slate-800 uppercase">{booking.carModel}</p><p className="text-[10px] font-black text-blue-600 tracking-widest">{booking.plate}</p></div></div></div>
+                <div className="flex items-center justify-between gap-4">
+                  <div className="space-y-1"><p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Serviço</p><p className="text-xs font-bold text-slate-600 uppercase">{booking.service}</p></div>
+                  <div className="space-y-1 text-right"><p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Valor</p><p className="text-sm font-black text-blue-600">R$ {booking.price.toFixed(2)}</p></div>
+                </div>
                 <div className="space-y-1"><p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">WhatsApp / Contato</p><button onClick={() => openWhatsApp(booking.phone)} className="w-full bg-emerald-50 text-emerald-600 p-3 rounded-2xl font-black text-xs uppercase tracking-widest flex items-center justify-center gap-2 hover:bg-emerald-600 hover:text-white transition-all border border-emerald-100 group"><MessageCircle size={16} /> {booking.phone} <ExternalLink size={12} className="opacity-50" /></button></div>
                 {booking.condition && (
                   <div className={`p-3 rounded-2xl border flex items-start gap-2 ${booking.condition.includes('Pesada') ? 'bg-red-50 border-red-100' : 'bg-orange-50 border-orange-100'}`}>{booking.condition.includes('Pesada') ? <AlertTriangle className="text-red-500 mt-0.5" size={14} /> : <AlertTriangle className="text-orange-500 mt-0.5" size={14} />}<p className={`text-[10px] font-bold leading-tight ${booking.condition.includes('Pesada') ? 'text-red-700' : 'text-orange-700'}`}>{booking.condition}</p></div>
@@ -120,12 +141,53 @@ const AdminFilaEspera: React.FC<AdminFilaEsperaProps> = ({ bookings, onUpdateSta
               <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                 <div className="space-y-1.5"><label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Cliente</label><input required className="w-full bg-slate-50 border-none rounded-2xl px-5 py-4 text-sm font-black text-slate-800" placeholder="Nome do Cliente" value={formData.customerName} onChange={e => setFormData({...formData, customerName: e.target.value})} /></div>
                 <div className="space-y-1.5"><label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">WhatsApp</label><input required className="w-full bg-slate-50 border-none rounded-2xl px-5 py-4 text-sm font-black text-slate-800" placeholder="(00) 00000-0000" value={formData.phone} onChange={e => setFormData({...formData, phone: e.target.value})} /></div>
+                
                 <div className="space-y-1.5 relative"><label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Marca</label><button type="button" onClick={() => setIsBrandOpen(!isBrandOpen)} className="w-full flex items-center justify-between p-4 bg-slate-50 border-none rounded-2xl text-left"><span className="text-sm font-black uppercase text-slate-800">{formData.carBrand || "Selecione..."}</span><ChevronDown size={16} className="text-slate-400" /></button>
                   {isBrandOpen && (<div className="absolute top-full left-0 right-0 mt-2 bg-white border border-slate-100 shadow-2xl rounded-2xl z-50 overflow-hidden"><div className="p-2 border-b border-slate-50 flex items-center gap-2"><Search size={14} className="text-slate-400" /><input className="w-full bg-transparent border-none text-xs font-bold p-1 outline-none" placeholder="Buscar..." value={brandSearch} onChange={e => setBrandSearch(e.target.value)} /></div><div className="max-h-40 overflow-y-auto">{filteredBrands.map(b => (<button key={b} type="button" onClick={() => { setFormData({...formData, carBrand: b, carModel: ''}); setIsBrandOpen(false); }} className="w-full px-4 py-2 text-left hover:bg-blue-50 text-xs font-bold text-slate-600 uppercase">{b}</button>))}</div></div>)}
                 </div>
                 <div className="space-y-1.5"><label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Modelo</label><input required className="w-full bg-slate-50 border-none rounded-2xl px-5 py-4 text-sm font-black text-slate-800" placeholder="Ex: Corolla" value={formData.carModel} onChange={e => setFormData({...formData, carModel: e.target.value})} /></div>
+                
                 <div className="space-y-1.5"><label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Placa</label><input required className="w-full bg-slate-50 border-none rounded-2xl px-5 py-4 text-sm font-black text-slate-800 uppercase tracking-widest" placeholder="ABC1234" value={formData.plate} onChange={e => setFormData({...formData, plate: e.target.value})} /></div>
                 <div className="space-y-1.5"><label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Categoria</label><select required className="w-full bg-slate-50 border-none rounded-2xl px-5 py-4 text-sm font-black text-slate-800" value={formData.category} onChange={e => setFormData({...formData, category: e.target.value as VehicleCategory})}><option value="">Selecione...</option><option value="Hatch">Hatch</option><option value="SEDA">Sedã</option><option value="SUV">SUV</option><option value="CAMINHONETE">Pick-up</option><option value="Moto">Moto</option></select></div>
+              </div>
+
+              {/* Seção de Serviço e Preço Manual */}
+              <div className="bg-blue-50 p-6 rounded-[2rem] border border-blue-100 space-y-4">
+                <div className="flex items-center gap-2 mb-2">
+                  <Wrench size={18} className="text-blue-600" />
+                  <h4 className="text-[10px] font-black text-blue-800 uppercase tracking-widest">Serviço e Valor</h4>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Serviço</label>
+                    <select 
+                      className="w-full bg-white border-none rounded-2xl px-5 py-4 text-sm font-black text-slate-800 shadow-sm"
+                      value={formData.service}
+                      onChange={e => setFormData({...formData, service: e.target.value})}
+                    >
+                      <option value="LAVAGEM COMPLETA">LAVAGEM COMPLETA</option>
+                      <option value="LIMPEZA INTERNA">LIMPEZA INTERNA</option>
+                      <option value="POLIMENTO">POLIMENTO</option>
+                      <option value="HIGIENIZAÇÃO">HIGIENIZAÇÃO</option>
+                      <option value="OUTRO SERVIÇO">OUTRO SERVIÇO</option>
+                    </select>
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Valor Manual (R$)</label>
+                    <div className="relative">
+                      <DollarSign className="absolute left-4 top-1/2 -translate-y-1/2 text-blue-600" size={18} />
+                      <input 
+                        required
+                        type="number"
+                        step="0.01"
+                        className="w-full bg-white border-none rounded-2xl pl-12 pr-5 py-4 text-sm font-black text-slate-800 shadow-sm focus:ring-2 focus:ring-blue-600 transition-all"
+                        placeholder="0.00"
+                        value={formData.price}
+                        onChange={e => setFormData({...formData, price: e.target.value})}
+                      />
+                    </div>
+                  </div>
+                </div>
               </div>
 
               {/* Nível de Sujeira Manual */}
@@ -142,22 +204,13 @@ const AdminFilaEspera: React.FC<AdminFilaEsperaProps> = ({ bookings, onUpdateSta
                 </div>
               </div>
 
-              {/* AVISO LEGAL IMPORTANTE NO ADMIN */}
-              <div className="bg-amber-50 border-2 border-amber-200 p-4 rounded-2xl flex items-start gap-3">
-                <AlertTriangle className="text-amber-600 shrink-0" size={20} />
-                <p className="text-[10px] font-bold text-amber-700 leading-tight">
-                  <span className="font-black uppercase block mb-0.5">Aviso ao Cliente</span>
-                  Informe ao cliente que a omissão de detalhes sobre o estado do veículo pode acarretar em reajuste no valor final caso a lavagem exija mais recursos.
-                </p>
-              </div>
-
               <div className="space-y-1.5">
                 <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Situação / Observações <span className="text-red-500">*</span></label>
                 <textarea required className="w-full bg-slate-50 border-none rounded-2xl px-5 py-4 text-sm font-bold text-slate-800 focus:ring-4 focus:ring-blue-500/5 transition-all resize-none" rows={3} placeholder="Ex: Riscos na porta direita, bancos com manchas..." value={formData.condition} onChange={e => setFormData({...formData, condition: e.target.value})} />
                 {!formData.condition && <p className="text-[9px] font-black text-orange-600 uppercase mt-1 ml-1 flex items-center gap-1"><AlertCircle size={10} /> Preenchimento obrigatório da situação.</p>}
               </div>
 
-              <button type="submit" disabled={!formData.condition} className="w-full bg-blue-600 text-white py-5 rounded-3xl font-black uppercase tracking-widest shadow-xl shadow-blue-500/20 hover:bg-blue-700 transition-all flex items-center justify-center gap-2 disabled:opacity-50">
+              <button type="submit" disabled={!formData.condition || !formData.price} className="w-full bg-blue-600 text-white py-5 rounded-3xl font-black uppercase tracking-widest shadow-xl shadow-blue-500/20 hover:bg-blue-700 transition-all flex items-center justify-center gap-2 disabled:opacity-50">
                 <Save size={20} /> Emitir O.S.
               </button>
             </form>

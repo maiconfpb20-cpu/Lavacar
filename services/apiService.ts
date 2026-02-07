@@ -1,5 +1,5 @@
 
-import { Booking, StaffMember, Client, AvailableSlot } from '../types.ts';
+import { Booking, StaffMember, Client, AvailableSlot, Expense } from '../types.ts';
 
 /**
  * CONFIGURAÇÃO SUPABASE - NOVO PROJETO
@@ -21,12 +21,14 @@ const SUPABASE_KEY = 'sb_publishable_DPMIxu9x_BpfeeQkRIVNRg_tuKbtCzF';
 
 export const WASH_ID = 'unidade_principal';
 
+// Fix: Add expenses to WashData interface to resolve type error in App.tsx
 export interface WashData {
   bookings: Booking[];
   staff: StaffMember[];
   clients: Client[];
   availableSlots: AvailableSlot[];
   adminPin: string;
+  expenses: Expense[];
 }
 
 export const switchUnit = (unitCode: string) => {

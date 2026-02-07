@@ -2,7 +2,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { 
   UserPlus, ShieldCheck, Mail, DollarSign, 
-  Plus, Minus, Calculator, X, Save, Trash2, Edit3, CheckCircle2, Wallet, History, Users, Receipt, AlertCircle, Lock, Key
+  Plus, Minus, Calculator, X, Save, Trash2, Edit3, CheckCircle2, Wallet, History, Users, Receipt, AlertCircle, Lock, Key,
+  QrCode, Copy, Landmark
 } from 'lucide-react';
 import { StaffMember, StaffPayment } from '../types.ts';
 
@@ -14,6 +15,8 @@ interface AdminFuncionariosProps {
 const AdminFuncionarios: React.FC<AdminFuncionariosProps> = ({ staff, setStaff }) => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isPinModalOpen, setIsPinModalOpen] = useState(false);
+  const [isPixModalOpen, setIsPixModalOpen] = useState(false);
+  
   const [pinValue, setPinValue] = useState('');
   const [pinError, setPinError] = useState(false);
   const [pendingAction, setPendingAction] = useState<{ type: 'DAY' | 'PAY', memberId: number, data?: any } | null>(null);
@@ -21,6 +24,7 @@ const AdminFuncionarios: React.FC<AdminFuncionariosProps> = ({ staff, setStaff }
   const [editingMember, setEditingMember] = useState<StaffMember | null>(null);
   const [payingId, setPayingId] = useState<number | null>(null);
   const [showSuccess, setShowSuccess] = useState<number | null>(null);
+  const [pixData, setPixData] = useState<{ code: string, amount: number, name: string, key: string } | null>(null);
   
   const pinInputRef = useRef<HTMLInputElement>(null);
 
@@ -28,12 +32,40 @@ const AdminFuncionarios: React.FC<AdminFuncionariosProps> = ({ staff, setStaff }
     name: '',
     role: '',
     email: '',
+    pixKey: '',
     status: 'Ativo',
     dailyRate: 80,
     workedDays: 0,
     totalPaid: 0,
     paymentHistory: []
   });
+
+  // Função para gerar string PIX (Simples BRCode)
+  const generatePixPayload = (key: string, name: string, amount: number) => {
+    const pad = (s: string) => s.length.toString().padStart(2, '0');
+    const cleanKey = key.replace(/\s/g, '');
+    const cleanName = name.normalize("NFD").replace(/[\u0300-\u036f]/g, "").substring(0, 25).toUpperCase();
+    
+    const part26 = `0014br.gov.bcb.pix01${pad(cleanKey)}${cleanKey}`;
+    const part54 = amount.toFixed(2);
+    const part59 = cleanName;
+    const part60 = "CURITIBA";
+    const part62 = "0507LAVACAR";
+    
+    let payload = `00020126${pad(part26)}${part26}52040000530398654${pad(part54)}${part54}5802BR59${pad(part59)}${part59}60${pad(part60)}${part60}62${pad(part62)}${part62}6304`;
+    
+    // Cálculo de CRC16 simplificado para o exemplo
+    let crc = 0xFFFF;
+    for (let i = 0; i < payload.length; i++) {
+      crc ^= payload.charCodeAt(i) << 8;
+      for (let j = 0; j < 8; j++) {
+        if (crc & 0x8000) crc = (crc << 1) ^ 0x1021;
+        else crc <<= 1;
+      }
+    }
+    const crcHex = (crc & 0xFFFF).toString(16).toUpperCase().padStart(4, '0');
+    return payload + crcHex;
+  };
 
   useEffect(() => {
     if (showSuccess) {
@@ -61,6 +93,7 @@ const AdminFuncionarios: React.FC<AdminFuncionariosProps> = ({ staff, setStaff }
         name: '',
         role: '',
         email: '',
+        pixKey: '',
         status: 'Ativo',
         dailyRate: 80,
         workedDays: 0,
@@ -101,7 +134,6 @@ const AdminFuncionarios: React.FC<AdminFuncionariosProps> = ({ staff, setStaff }
     }
   };
 
-  // Solicitar PIN para alterar dias
   const requestDayChange = (id: number, delta: number) => {
     setPendingAction({ type: 'DAY', memberId: id, data: { delta } });
     setIsPinModalOpen(true);
@@ -109,14 +141,17 @@ const AdminFuncionarios: React.FC<AdminFuncionariosProps> = ({ staff, setStaff }
     setPinError(false);
   };
 
-  // Solicitar PIN para pagamento
   const requestPayment = (member: StaffMember) => {
     const amountToPay = member.dailyRate * member.workedDays;
     if (amountToPay <= 0) {
       alert("Este funcionário não possui dias trabalhados para receber pagamento.");
       return;
     }
-    setPendingAction({ type: 'PAY', memberId: member.id, data: { amountToPay, memberName: member.name } });
+    if (!member.pixKey) {
+      alert("Cadastre uma Chave PIX no perfil deste funcionário antes de pagar.");
+      return;
+    }
+    setPendingAction({ type: 'PAY', memberId: member.id, data: { amountToPay, memberName: member.name, pixKey: member.pixKey } });
     setIsPinModalOpen(true);
     setPinValue('');
     setPinError(false);
@@ -124,15 +159,12 @@ const AdminFuncionarios: React.FC<AdminFuncionariosProps> = ({ staff, setStaff }
 
   const verifyPinAndExecute = (e?: React.FormEvent) => {
     if (e) e.preventDefault();
-    
-    // Ler o PIN dinamicamente do localStorage
     const savedPin = localStorage.getItem('lavacar_admin_pin') || '1844';
 
     if (pinValue === savedPin) {
       executeAction();
       setIsPinModalOpen(false);
       setPinValue('');
-      setPendingAction(null);
     } else {
       setPinError(true);
       setPinValue('');
@@ -152,8 +184,9 @@ const AdminFuncionarios: React.FC<AdminFuncionariosProps> = ({ staff, setStaff }
         }
         return member;
       }));
+      setPendingAction(null);
     } else if (pendingAction.type === 'PAY') {
-      const { amountToPay } = pendingAction.data;
+      const { amountToPay, memberName, pixKey } = pendingAction.data;
       setPayingId(pendingAction.memberId);
       
       const newPayment: StaffPayment = {
@@ -175,8 +208,14 @@ const AdminFuncionarios: React.FC<AdminFuncionariosProps> = ({ staff, setStaff }
         return m;
       }));
 
+      // Gerar Dados para o Modal PIX
+      const pixCode = generatePixPayload(pixKey, memberName, amountToPay);
+      setPixData({ code: pixCode, amount: amountToPay, name: memberName, key: pixKey });
+      setIsPixModalOpen(true);
+      
       setShowSuccess(pendingAction.memberId);
       setPayingId(null);
+      setPendingAction(null);
     }
   };
 
@@ -192,7 +231,7 @@ const AdminFuncionarios: React.FC<AdminFuncionariosProps> = ({ staff, setStaff }
         <div>
           <h2 className="text-2xl font-black text-slate-800 tracking-tighter uppercase">Gestão de Equipe</h2>
           <div className="flex items-center gap-2 mt-1">
-            <p className="text-blue-600 text-sm font-bold tracking-widest uppercase">Pagamentos Protegidos</p>
+            <p className="text-blue-600 text-sm font-bold tracking-widest uppercase">Pagamentos Protegidos via PIX</p>
             <ShieldCheck size={14} className="text-emerald-500" />
           </div>
         </div>
@@ -234,9 +273,16 @@ const AdminFuncionarios: React.FC<AdminFuncionariosProps> = ({ staff, setStaff }
                 </div>
                 
                 <h4 className="font-black text-slate-800 uppercase tracking-tight mb-1">{member.name}</h4>
-                <span className="text-[10px] font-black text-blue-600 uppercase tracking-widest bg-blue-50 px-3 py-1 rounded-full">
-                  {member.role}
-                </span>
+                <div className="flex flex-col items-center gap-1">
+                  <span className="text-[10px] font-black text-blue-600 uppercase tracking-widest bg-blue-50 px-3 py-1 rounded-full">
+                    {member.role}
+                  </span>
+                  {member.pixKey && (
+                    <span className="text-[8px] font-black text-slate-400 uppercase flex items-center gap-1">
+                      <QrCode size={10} /> Chave PIX Cadastrada
+                    </span>
+                  )}
+                </div>
               </div>
 
               <div className="bg-slate-50 p-5 rounded-3xl space-y-4 flex-1">
@@ -245,7 +291,7 @@ const AdminFuncionarios: React.FC<AdminFuncionariosProps> = ({ staff, setStaff }
                     <Calculator size={14} className="text-blue-600" /> Folha Atual
                   </h5>
                   <div className="flex items-center gap-1 text-[8px] font-black text-slate-300 uppercase">
-                    <Lock size={10} /> PIN Requerido
+                    <Lock size={10} /> PIN Protegido
                   </div>
                 </div>
 
@@ -284,33 +330,6 @@ const AdminFuncionarios: React.FC<AdminFuncionariosProps> = ({ staff, setStaff }
                     <Wallet size={20} />
                   </div>
                 </div>
-
-                <div className="pt-4 border-t border-slate-200">
-                   <h6 className="text-[9px] font-black text-slate-400 uppercase tracking-[0.2em] mb-2 flex items-center gap-2">
-                     <Receipt size={12} /> Histórico Recente
-                   </h6>
-                   <div className="space-y-1.5 max-h-24 overflow-y-auto pr-1 scrollbar-hide custom-scrollbar">
-                     {member.paymentHistory && member.paymentHistory.length > 0 ? (
-                       member.paymentHistory.slice(0, 5).map((pay) => (
-                         <div key={pay.id} className="bg-white/60 p-2 rounded-xl border border-slate-200 flex items-center justify-between animate-in slide-in-from-top-1">
-                           <div>
-                             <p className="text-[8px] font-black text-slate-800 uppercase tracking-tighter">REC-#{pay.id}</p>
-                             <p className="text-[7px] font-bold text-slate-400 uppercase">{new Date(pay.date).toLocaleDateString()}</p>
-                           </div>
-                           <span className="text-[10px] font-black text-emerald-600">+ R$ {pay.amount.toFixed(2)}</span>
-                         </div>
-                       ))
-                     ) : (
-                       <div className="py-4 text-center">
-                         <p className="text-[8px] text-slate-300 font-black uppercase tracking-widest italic">Sem registros</p>
-                       </div>
-                     )}
-                   </div>
-                   <div className="mt-3 flex items-center justify-between bg-white p-2 rounded-xl border border-slate-200 shadow-sm">
-                      <span className="text-[8px] font-black text-slate-400 uppercase">Acumulado Pago</span>
-                      <span className="text-[11px] font-black text-slate-800">R$ {(member.totalPaid || 0).toFixed(2)}</span>
-                   </div>
-                </div>
               </div>
 
               <button 
@@ -325,17 +344,74 @@ const AdminFuncionarios: React.FC<AdminFuncionariosProps> = ({ staff, setStaff }
                 }`}
               >
                 {showSuccess === member.id ? (
-                  <><CheckCircle2 size={16} /> Sucesso!</>
+                  <><CheckCircle2 size={16} /> Pago via PIX</>
                 ) : payingId === member.id ? (
                   <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
-                ) : member.workedDays === 0 ? (
-                  <><AlertCircle size={14} /> Saldo Zerado</>
                 ) : (
-                  <><DollarSign size={16} /> Efetuar Pagamento</>
+                  <><DollarSign size={16} /> Efetuar Pagamento PIX</>
                 )}
               </button>
             </div>
           ))}
+        </div>
+      )}
+
+      {/* MODAL DE PIX QR CODE */}
+      {isPixModalOpen && pixData && (
+        <div className="fixed inset-0 z-[80] flex items-center justify-center p-4 bg-slate-900/80 backdrop-blur-xl animate-in fade-in duration-300">
+          <div className="bg-white w-full max-w-sm rounded-[3rem] shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200">
+            <header className="bg-emerald-600 p-8 text-center text-white relative">
+              <div className="w-16 h-16 bg-white/20 rounded-2xl flex items-center justify-center mx-auto mb-4">
+                <QrCode size={32} />
+              </div>
+              <h3 className="font-black uppercase tracking-widest text-lg">Pagar Funcionário</h3>
+              <p className="text-[10px] text-white/70 font-bold uppercase tracking-[0.2em] mt-2">Transação PIX Instantânea</p>
+              <button onClick={() => setIsPixModalOpen(false)} className="absolute top-6 right-6 text-white/50 hover:text-white"><X size={24} /></button>
+            </header>
+
+            <div className="p-8 space-y-6 flex flex-col items-center">
+              <div className="text-center">
+                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Valor do Pagamento</p>
+                <h4 className="text-3xl font-black text-slate-800">R$ {pixData.amount.toFixed(2)}</h4>
+                <p className="text-xs font-bold text-blue-600 uppercase mt-1">{pixData.name}</p>
+              </div>
+
+              <div className="bg-slate-50 p-4 rounded-[2rem] border-2 border-slate-100 relative group">
+                <img 
+                  src={`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(pixData.code)}`}
+                  alt="QR Code PIX"
+                  className="w-48 h-48 rounded-xl"
+                />
+                <div className="absolute inset-0 bg-white/40 backdrop-blur-[2px] opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center rounded-xl pointer-events-none">
+                   <p className="text-[10px] font-black uppercase text-slate-800 bg-white px-3 py-1 rounded-full shadow-lg">Scan para Pagar</p>
+                </div>
+              </div>
+
+              <div className="w-full space-y-3">
+                <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100">
+                  <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">Chave Destino</p>
+                  <p className="text-xs font-bold text-slate-700 truncate">{pixData.key}</p>
+                </div>
+                
+                <button 
+                  onClick={() => {
+                    navigator.clipboard.writeText(pixData.code);
+                    alert("Código PIX Copia e Cola copiado!");
+                  }}
+                  className="w-full bg-slate-100 text-slate-600 py-4 rounded-2xl font-black text-[10px] uppercase tracking-widest hover:bg-slate-200 transition-all flex items-center justify-center gap-2"
+                >
+                  <Copy size={16} /> Copiar Código PIX
+                </button>
+              </div>
+
+              <button 
+                onClick={() => setIsPixModalOpen(false)}
+                className="w-full bg-slate-900 text-white py-5 rounded-2xl font-black text-[11px] uppercase tracking-[0.2em] shadow-xl active:scale-95 transition-all"
+              >
+                Concluir Pagamento
+              </button>
+            </div>
+          </div>
         </div>
       )}
 
@@ -403,7 +479,7 @@ const AdminFuncionarios: React.FC<AdminFuncionariosProps> = ({ staff, setStaff }
       {/* Modal de Cadastro/Edição */}
       {isModalOpen && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm animate-in fade-in duration-200">
-          <div className="bg-white w-full max-lg rounded-[2.5rem] shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200">
+          <div className="bg-white w-full max-w-lg rounded-[2.5rem] shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200">
             <header className="bg-blue-600 p-6 flex items-center justify-between text-white">
               <div className="flex items-center gap-3">
                 <div className="p-2 bg-white/20 rounded-xl"><UserPlus size={20} /></div>
@@ -436,6 +512,17 @@ const AdminFuncionarios: React.FC<AdminFuncionariosProps> = ({ staff, setStaff }
                   </div>
                 </div>
 
+                <div className="bg-blue-50 p-6 rounded-3xl border border-blue-100 space-y-3">
+                  <div className="flex items-center gap-2 mb-1">
+                    <Landmark size={16} className="text-blue-600" />
+                    <h5 className="text-[10px] font-black text-blue-800 uppercase tracking-widest">Dados para Pagamento PIX</h5>
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] font-black text-slate-400 uppercase ml-1">Chave PIX (CPF, Celular, E-mail ou Aleatória)</label>
+                    <input className="w-full bg-white border-none rounded-xl px-4 py-3 text-sm font-black text-slate-800 focus:ring-4 focus:ring-blue-500/10" placeholder="Insira a chave do funcionário" value={formData.pixKey} onChange={e => setFormData({...formData, pixKey: e.target.value})} />
+                  </div>
+                </div>
+
                 <div className="space-y-1.5">
                   <label className="text-[10px] font-black text-slate-400 uppercase ml-1">E-mail de Contato</label>
                   <input required type="email" className="w-full bg-slate-50 border-none rounded-2xl px-5 py-4 text-sm font-black text-slate-800 focus:ring-4 focus:ring-blue-500/5" value={formData.email} onChange={e => setFormData({...formData, email: e.target.value})} />
@@ -457,7 +544,7 @@ const AdminFuncionarios: React.FC<AdminFuncionariosProps> = ({ staff, setStaff }
                 {editingMember && (
                   <button type="button" onClick={(e) => handleDeleteMember(e as any, editingMember.id)} className="p-4 bg-red-50 text-red-500 rounded-2xl hover:bg-red-500 hover:text-white transition-all"><Trash2 size={24} /></button>
                 )}
-                <button type="submit" className="flex-1 bg-blue-600 text-white py-4 rounded-2xl font-black uppercase tracking-widest hover:bg-blue-700 transition-all shadow-xl shadow-blue-500/20"><Save size={20} className="inline mr-2" /> Salvar</button>
+                <button type="submit" className="flex-1 bg-blue-600 text-white py-4 rounded-2xl font-black uppercase tracking-widest hover:bg-blue-700 transition-all shadow-xl shadow-blue-500/20"><Save size={20} className="inline mr-2" /> Salvar Alterações</button>
               </div>
             </form>
           </div>
