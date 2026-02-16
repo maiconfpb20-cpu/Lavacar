@@ -38,12 +38,7 @@ const App: React.FC = () => {
   
   const [availableSlots, setAvailableSlots] = useState<AvailableSlot[]>(() => {
     const saved = getLocalData('slots', []);
-    if (saved.length === 0) {
-      return [
-        { id: 'init-slot-2', date: '2026-01-26', time: '11:30' }
-      ];
-    }
-    return saved.filter((s: AvailableSlot) => !(s.date === '2026-01-26' && s.time === '09:30'));
+    return saved;
   });
   
   const [adminPin, setAdminPin] = useState(() => localStorage.getItem('lavacar_admin_pin') || '1844');
@@ -110,11 +105,29 @@ const App: React.FC = () => {
       createdAt: new Date()
     };
     setBookings(prev => [...prev, booking]);
-    setAvailableSlots(prev => prev.filter(s => !(s.date === newBooking.date && s.time === newBooking.time)));
+  };
+
+  const addManualBooking = (newBooking: Omit<Booking, 'id' | 'createdAt'>) => {
+    const booking: Booking = {
+      ...newBooking,
+      id: Math.random().toString(36).substr(2, 9).toUpperCase(),
+      createdAt: new Date()
+    };
+    setBookings(prev => [...prev, booking]);
+  };
+
+  const updateBooking = (id: string, updates: Partial<Booking>) => {
+    setBookings(prev => prev.map(b => b.id === id ? { ...b, ...updates } : b));
   };
 
   const updateBookingStatus = (id: string, status: BookingStatus) => {
     setBookings(prev => prev.map(b => b.id === id ? { ...b, status } : b));
+  };
+
+  const removeBooking = (id: string) => {
+    if (window.confirm('Deseja excluir este registro permanentemente?')) {
+      setBookings(prev => prev.filter(b => b.id !== id));
+    }
   };
 
   const addClient = (newClient: Omit<Client, 'id' | 'visitCount' | 'totalSpent' | 'createdAt'>) => {
@@ -169,7 +182,7 @@ const App: React.FC = () => {
       case MenuSection.Dashboard: return <Dashboard bookings={bookings} />;
       case MenuSection.Agendamentos: return <AdminAgendamentos bookings={bookings} onUpdateStatus={updateBookingStatus} />;
       case MenuSection.FilaDeEspera: return <AdminFilaEspera bookings={bookings} onUpdateStatus={updateBookingStatus} onAddBooking={addBooking} />;
-      case MenuSection.Historico: return <AdminHistorico bookings={bookings} />;
+      case MenuSection.Historico: return <AdminHistorico bookings={bookings} onUpdateBooking={updateBooking} onAddManualBooking={addManualBooking} onRemoveBooking={removeBooking} />;
       case MenuSection.Funcionarios: return <AdminFuncionarios staff={staff} setStaff={setStaff} />;
       case MenuSection.Clientes: return <AdminClientes clients={clients} onAddClient={addClient} />;
       case MenuSection.Veiculos: return <AdminVeiculos bookings={bookings} />;
